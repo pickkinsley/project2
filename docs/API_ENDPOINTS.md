@@ -29,7 +29,7 @@ All error responses use this consistent structure:
 |---|---|
 | `201` | Trip created successfully |
 | `200` | Successful GET or PATCH |
-| `400` | Invalid request body (missing fields, bad date format, return before departure) |
+| `400` | Invalid request body (missing fields, bad dates, unresolvable destination) |
 | `404` | Trip UUID or item ID not found |
 | `500` | Unexpected server error |
 
@@ -60,14 +60,18 @@ All error responses use this consistent structure:
 **Backend execution order:**
 1. Validate request body
 2. Geocode destination via Open-Meteo geocoding API → get lat/lon
-3. Fetch weather forecast via Open-Meteo (or generate seasonal estimate if >16 days out or API fails)
+   - If no results returned: respond `400 destination_not_found`, stop
+3. Attempt weather forecast via Open-Meteo
+   - If trip is ≤16 days out and API succeeds: store forecast, set `is_forecast: true`
+   - If trip is >16 days out or API fails: store null forecast, set `is_forecast: false`
 4. Run rule engine with trip details + weather → generate packing items
+   - Weather rules are skipped when `is_forecast: false`
 5. Write `trips` row to MySQL
 6. Write `weather_snapshots` row to MySQL
 7. Write all `packing_items` rows to MySQL
 8. Return complete trip
 
-**If Open-Meteo fails:** Generate seasonal estimate from destination + departure month. Set `is_forecast: false`. Continue with trip creation — do not fail the request.
+**If Open-Meteo fails or trip is >16 days out:** Set `is_forecast: false`, skip weather rules, continue with trip creation. The response includes `"weather": null`. The frontend shows the banner: "Weather forecast unavailable — showing general recommendations for [trip type]".
 
 **Response `201 Created`:**
 ```json
@@ -136,13 +140,22 @@ All error responses use this consistent structure:
 }
 ```
 
-**Response `400 Bad Request`:**
+**Response `400 Bad Request` — validation error:**
 ```json
 {
   "error": "invalid_request",
   "message": "return_date must be after departure_date."
 }
 ```
+
+**Response `400 Bad Request` — destination not found:**
+```json
+{
+  "error": "destination_not_found",
+  "message": "We couldn't find that destination. Try being more specific."
+}
+```
+Returned when Open-Meteo geocoding returns no results. Occurs after validation passes but before weather fetch. Trip is not written to the database.
 
 **Tables written:** `trips`, `weather_snapshots`, `packing_items`
 

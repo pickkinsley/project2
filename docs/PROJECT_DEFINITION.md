@@ -17,8 +17,8 @@ PackSmart generates a personalized packing list in seconds by combining your tri
 1. **Trip input form** — destination, dates, travel companions, activities, trip category
 2. **Automatic weather forecast** via Open-Meteo (free, no API key) for trips within 16 days; seasonal fallback message for trips further out
 3. **Rule-based packing list generation** personalized to weather + trip type + duration + activities
-4. **Checklist with checkboxes** to mark items as packed, persisted via localStorage
-5. **Trip categories** that meaningfully change the list (international vs. beach vs. staying with friends vs. ski trip)
+4. **Checklist with checkboxes** to mark items as packed, persisted in MySQL (shareable across devices via trip URL)
+5. **Trip categories** that meaningfully change the list (international vs. beach vs. cold weather vs. staying with friends) — ski trips use `cold_weather` trip type with `skiing` activity
 
 ## Deferred Features (Post-MVP)
 

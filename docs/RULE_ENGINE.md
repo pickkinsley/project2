@@ -65,7 +65,9 @@ Capped at 7 — trips longer than a week assume laundry access.
 
 ## Rule Group 2: Trip Type Rules
 
-Each trip type adds a distinct block of items. `staying_with_friends` is the only type that also *removes* items.
+Each trip type adds a distinct block of items. `staying_with_friends` is the only type that also *removes* items (see Removal Mechanism below).
+
+**Ski trips:** Use `trip_type: "cold_weather"` with `activities: ["skiing"]`. The cold_weather trip type handles base cold gear; the skiing activity adds ski-specific items on top.
 
 **`international`**
 - Adds: Passport ⚠️, power adapter ⚠️, travel insurance docs ⚠️, foreign currency, visa reminder, copies of documents, notify-your-bank reminder
@@ -78,7 +80,7 @@ Each trip type adds a distinct block of items. `staying_with_friends` is the onl
 **`cold_weather`**
 - Adds: Heavy coat, thermals (top + bottom), gloves, hat, scarf, wool socks, hand warmers, lip balm
 - Removes: nothing
-- Note: Stacks with weather rules — cold weather trip in a blizzard gets both
+- Note: Stacks with weather rules when forecast is available
 
 **`weekend_getaway`**
 - Adds: nothing beyond base list
@@ -92,7 +94,15 @@ Each trip type adds a distinct block of items. `staying_with_friends` is the onl
 
 ## Rule Group 3: Weather Rules
 
-Uses `temp_min_f` as the cold anchor (the coldest it will be determines what to pack).
+**Weather rules only run when `is_forecast: true`.** If the forecast is unavailable (trip is >16 days out or Open-Meteo fails), weather rules are skipped entirely and the frontend displays a banner:
+
+> "Weather forecast unavailable — showing general recommendations for [trip type]"
+
+The rest of the rule engine (base list, trip type, activities, companions) runs normally. Only weather-specific clothing and rain/snow gear is omitted.
+
+---
+
+**When forecast is available, uses `temp_min_f` as the cold anchor:**
 
 **Temperature thresholds:**
 
@@ -115,9 +125,6 @@ Uses `temp_min_f` as the cold anchor (the coldest it will be determines what to 
 - "Paris will be 52–63°F during your trip — pack a light jacket"
 - "2 rainy days expected — umbrella recommended"
 - "Pack a rain jacket — 4 of your 5 days have rain forecast"
-
-**If `is_forecast: false`** (seasonal estimate): reasoning strings use softer language:
-- "April in Paris is typically 50–60°F — a light jacket is recommended"
 
 ---
 
@@ -184,6 +191,22 @@ Items are distributed into categories and displayed in this fixed order:
 | 7 | Activity Specific | 75–99 | Hiking boots, Dressy outfit, Daypack |
 
 The frontend renders items in `sort_order` order — no client-side sorting required.
+
+---
+
+## Removal Mechanism
+
+The rule engine is additive by default — rules only add items. `staying_with_friends` is the one exception: it removes specific toiletries that the host is expected to provide.
+
+**How it works:** The base list is built first (Rule Group 1). Trip type rules run second (Rule Group 2). When `trip_type === "staying_with_friends"`, after adding host gift and thank-you note, the engine runs a removal pass — it filters out items by name from the current list:
+
+```
+remove: ["shampoo", "conditioner", "body wash"]
+```
+
+The result is a trimmed toiletries section: toothbrush, toothpaste, deodorant, razor only.
+
+**Why a separate removal pass, not a flag on base items:** Keeps the base list clean and self-contained. Removal is an exception, not a pattern — one trip type needs it. A removal list applied after Rule Group 2 is the simplest implementation with no side effects on other rule groups.
 
 ---
 
