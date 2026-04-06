@@ -1,0 +1,101 @@
+name: Deploy PackSmart
+
+on:
+  push:
+    branches: [master]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # -------------------------------------------------------
+      # 1. Checkout
+      # -------------------------------------------------------
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # -------------------------------------------------------
+      # 2. Build frontend
+      # -------------------------------------------------------
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+      # -------------------------------------------------------
+      # 3. Build backend for Linux
+      # -------------------------------------------------------
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache-dependency-path: backend/go.sum
+
+      - name: Build backend binary (Linux amd64)
+        working-directory: backend
+        env:
+          GOOS: linux
+          GOARCH: amd64
+          CGO_ENABLED: '0'
+        run: go build -o server main.go
+
+      # -------------------------------------------------------
+      # 4. Configure SSH
+      # -------------------------------------------------------
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/lightsail.pem
+          chmod 600 ~/.ssh/lightsail.pem
+          ssh-keyscan -H ${{ secrets.SERVER_IP }} >> ~/.ssh/known_hosts
+
+      # -------------------------------------------------------
+      # 5. Deploy frontend
+      # -------------------------------------------------------
+      - name: Deploy frontend to /var/www/packsmart
+        run: |
+          scp -i ~/.ssh/lightsail.pem -r frontend/dist/* \
+            ubuntu@${{ secrets.SERVER_IP }}:/var/www/packsmart/
+
+      # -------------------------------------------------------
+      # 6. Deploy backend
+      # -------------------------------------------------------
+      - name: Deploy backend binary
+        run: |
+          scp -i ~/.ssh/lightsail.pem backend/server \
+            ubuntu@${{ secrets.SERVER_IP }}:/home/ubuntu/packsmart-backend/server.new
+
+      # -------------------------------------------------------
+      # 7. Restart backend service
+      # -------------------------------------------------------
+      - name: Restart backend service
+        run: |
+          ssh -i ~/.ssh/lightsail.pem ubuntu@${{ secrets.SERVER_IP }} << 'EOF'
+            # Atomic swap: put new binary in place
+            mv /home/ubuntu/packsmart-backend/server.new \
+               /home/ubuntu/packsmart-backend/server
+            chmod +x /home/ubuntu/packsmart-backend/server
+
+            # Restart: prefer systemd, fall back to nohup
+            if systemctl is-active --quiet packsmart; then
+              sudo systemctl restart packsmart
+            else
+              pkill -f "packsmart-backend/server" || true
+              sleep 1
+              cd /home/ubuntu/packsmart-backend
+              nohup ./server > server.log 2>&1 &
+            fi
+
+            echo "Backend restarted successfully"
+          EOF
