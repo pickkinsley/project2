@@ -13,6 +13,7 @@ func main() {
 	api := r.Group("/api")
 	{
 		api.GET("/health", handlers.Health)
+		api.GET("/trips/:uuid", handlers.GetTrip)
 	}
 
 	log.Println("PackSmart backend starting on :8080")
