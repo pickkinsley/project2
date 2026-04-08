@@ -1,29 +1,22 @@
 package main
 
 import (
-	"encoding/json"
 	"log"
-	"net/http"
+
+	"github.com/gin-gonic/gin"
+	"github.com/pickkinsley/project2/backend/handlers"
 )
 
-func healthHandler(w http.ResponseWriter, r *http.Request) {
-	log.Printf("%s %s", r.Method, r.URL.Path)
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-
-	json.NewEncoder(w).Encode(map[string]string{
-		"status": "ok",
-		"app":    "PackSmart",
-		"phase":  "Module 4 Infrastructure Test",
-	})
-}
-
 func main() {
-	http.HandleFunc("/api/health", healthHandler)
+	r := gin.Default()
 
-	log.Println("PackSmart backend running on :8080")
-	if err := http.ListenAndServe(":8080", nil); err != nil {
-		log.Fatalf("Server failed to start: %v", err)
+	api := r.Group("/api")
+	{
+		api.GET("/health", handlers.Health)
+	}
+
+	log.Println("PackSmart backend starting on :8080")
+	if err := r.Run(":8080"); err != nil {
+		log.Fatalf("Failed to start server: %v", err)
 	}
 }
