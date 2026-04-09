@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -167,4 +168,48 @@ func GetTrip(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, mockTrip)
+}
+
+// UpdateItemCheckbox handles PATCH /api/trips/:uuid/items/:itemId
+// TODO (Lesson 2): Verify item belongs to trip and update is_checked in MySQL.
+func UpdateItemCheckbox(c *gin.Context) {
+	tripUUID := c.Param("uuid")
+	itemIDStr := c.Param("itemId")
+
+	// Verify trip exists (mock: only the hardcoded UUID is valid)
+	if tripUUID != mockTripID {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error":   "trip_not_found",
+			"message": "No trip found with that ID.",
+		})
+		return
+	}
+
+	// Parse item ID
+	itemID, err := strconv.Atoi(itemIDStr)
+	if err != nil || itemID < 1 {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error":   "item_not_found",
+			"message": "No item found with that ID for this trip.",
+		})
+		return
+	}
+
+	// Validate request body
+	var req models.UpdateItemRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "invalid_request",
+			"message": "Request body must be JSON with an is_checked boolean field.",
+		})
+		return
+	}
+
+	// TODO (Lesson 2): Verify item ID exists in packing_items and belongs to this trip.
+	// TODO (Lesson 2): UPDATE packing_items SET is_checked = ? WHERE id = ? AND trip_id = ?
+
+	c.JSON(http.StatusOK, models.UpdateItemResponse{
+		ID:        itemID,
+		IsChecked: req.IsChecked,
+	})
 }

@@ -15,6 +15,7 @@ func main() {
 		api.GET("/health", handlers.Health)
 		api.POST("/trips", handlers.CreateTrip)
 		api.GET("/trips/:uuid", handlers.GetTrip)
+		api.PATCH("/trips/:uuid/items/:itemId", handlers.UpdateItemCheckbox)
 	}
 
 	log.Println("PackSmart backend starting on :8080")
