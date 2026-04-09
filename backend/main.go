@@ -13,6 +13,7 @@ func main() {
 	api := r.Group("/api")
 	{
 		api.GET("/health", handlers.Health)
+		api.POST("/trips", handlers.CreateTrip)
 		api.GET("/trips/:uuid", handlers.GetTrip)
 	}
 
