@@ -1,53 +1,35 @@
 package handlers
 
 import (
+	"context"
+	"database/sql"
+	"encoding/json"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	dbpkg "github.com/pickkinsley/project2/backend/db"
 	"github.com/pickkinsley/project2/backend/models"
 )
 
-// mockTripID is the UUID returned by the mock handler.
-// Replace with real database lookups in Lesson 2.
-const mockTripID = "a3f8c2d1-4b5e-4c3d-8f9a-1b2c3d4e5f6a"
+// Handler holds the database connection and query interface.
+type Handler struct {
+	db *sql.DB
+	q  *dbpkg.Queries
+}
 
-var mockTrip = models.TripResponse{
-	ID:            mockTripID,
-	Destination:   "Paris, France",
-	DepartureDate: "2026-04-10",
-	ReturnDate:    "2026-04-15",
-	TripType:      "international",
-	Companions:    "couple",
-	Activities:    []string{"sightseeing", "fine_dining"},
-	DurationDays:  5,
-	Weather: &models.WeatherResponse{
-		TempMinF:   52,
-		TempMaxF:   63,
-		RainDays:   2,
-		SnowDays:   0,
-		IsForecast: true,
-		DailyForecast: []models.DailyForecast{
-			{Date: "2026-04-10", Icon: "partly_cloudy", MinF: 50, MaxF: 61},
-			{Date: "2026-04-11", Icon: "rainy", MinF: 48, MaxF: 55},
-			{Date: "2026-04-12", Icon: "sunny", MinF: 52, MaxF: 63},
-			{Date: "2026-04-13", Icon: "partly_cloudy", MinF: 51, MaxF: 60},
-			{Date: "2026-04-14", Icon: "rainy", MinF: 49, MaxF: 57},
-		},
-	},
-	Items: []models.PackingItem{
-		{ID: 1, Name: "Passport", Category: "Essential Items", IsEssential: true, Reason: "Required for international travel", IsChecked: false, SortOrder: 1},
-		{ID: 2, Name: "Prescriptions", Category: "Essential Items", IsEssential: true, Reason: "Never travel without your medications", IsChecked: false, SortOrder: 2},
-		{ID: 3, Name: "Light jacket", Category: "Clothing", IsEssential: false, Reason: "Paris will be 52–63°F during your trip", IsChecked: false, SortOrder: 22},
-		{ID: 4, Name: "Umbrella", Category: "Clothing", IsEssential: false, Reason: "2 rainy days expected during your trip", IsChecked: false, SortOrder: 23},
-	},
+// NewHandler creates a Handler with an open database connection.
+func NewHandler(sqlDB *sql.DB, q *dbpkg.Queries) *Handler {
+	return &Handler{db: sqlDB, q: q}
 }
 
 // CreateTrip handles POST /api/trips.
-// TODO (Lesson 2): Replace mock data with geocoding, weather fetch, rule engine, and DB writes.
-func CreateTrip(c *gin.Context) {
+// TODO (Lesson 2 — geocoding): Replace DestLat/DestLon "0.000000" with real Open-Meteo geocoding.
+// TODO (Lesson 2 — weather): Replace mockWeather() with real Open-Meteo forecast.
+// TODO (Lesson 2 — rules): Replace mockItems() with real rule engine output.
+func (h *Handler) CreateTrip(c *gin.Context) {
 	var req models.CreateTripRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -57,7 +39,6 @@ func CreateTrip(c *gin.Context) {
 		return
 	}
 
-	// Calculate duration
 	departure, err := time.Parse("2006-01-02", req.DepartureDate)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -83,14 +64,91 @@ func CreateTrip(c *gin.Context) {
 	}
 	durationDays := int(returnDate.Sub(departure).Hours()/24) + 1
 
-	// TODO (Lesson 2): Geocode req.Destination → lat/lon via Open-Meteo geocoding API.
-	// TODO (Lesson 2): Fetch weather forecast via Open-Meteo forecast API.
-	// TODO (Lesson 2): Run rule engine with trip context + weather.
-	// TODO (Lesson 2): Write trip, weather, and items to MySQL in a transaction.
-
 	tripID := uuid.New().String()
+	ctx := context.Background()
 
-	response := models.TripResponse{
+	activitiesJSON, err := json.Marshal(req.Activities)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Failed to encode activities."})
+		return
+	}
+
+	weather := mockWeather()
+	items := mockItems(req.TripType)
+
+	forecastJSON, err := json.Marshal(weather.DailyForecast)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Failed to encode forecast."})
+		return
+	}
+
+	// Write trip, weather, and items in a single transaction.
+	tx, err := h.db.Begin()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Failed to start transaction."})
+		return
+	}
+	qtx := h.q.WithTx(tx)
+
+	if err := qtx.InsertTrip(ctx, dbpkg.InsertTripParams{
+		ID:            tripID,
+		Destination:   req.Destination,
+		DestLat:       "0.000000", // TODO: replace with geocoded lat
+		DestLon:       "0.000000", // TODO: replace with geocoded lon
+		DepartureDate: departure,
+		ReturnDate:    returnDate,
+		TripType:      req.TripType,
+		Companions:    req.Companions,
+		Activities:    json.RawMessage(activitiesJSON),
+	}); err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Failed to save trip."})
+		return
+	}
+
+	if err := qtx.InsertWeatherSnapshot(ctx, dbpkg.InsertWeatherSnapshotParams{
+		TripID:        tripID,
+		TempMinF:      int32(weather.TempMinF),
+		TempMaxF:      int32(weather.TempMaxF),
+		RainDays:      int32(weather.RainDays),
+		SnowDays:      int32(weather.SnowDays),
+		IsForecast:    weather.IsForecast,
+		DailyForecast: json.RawMessage(forecastJSON),
+	}); err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Failed to save weather."})
+		return
+	}
+
+	for _, item := range items {
+		if err := qtx.InsertPackingItem(ctx, dbpkg.InsertPackingItemParams{
+			TripID:      tripID,
+			Name:        item.Name,
+			Category:    item.Category,
+			IsEssential: item.IsEssential,
+			Reason:      sql.NullString{String: item.Reason, Valid: item.Reason != ""},
+			IsChecked:   false,
+			SortOrder:   int32(item.SortOrder),
+		}); err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Failed to save packing items."})
+			return
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Failed to commit transaction."})
+		return
+	}
+
+	// Fetch items back to get their auto-assigned IDs.
+	dbItems, err := h.q.GetItemsByTripID(ctx, tripID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Failed to retrieve packing items."})
+		return
+	}
+
+	c.JSON(http.StatusCreated, models.TripResponse{
 		ID:            tripID,
 		Destination:   req.Destination,
 		DepartureDate: req.DepartureDate,
@@ -100,15 +158,143 @@ func CreateTrip(c *gin.Context) {
 		Activities:    req.Activities,
 		DurationDays:  durationDays,
 		CreatedAt:     time.Now().UTC(),
-		Weather:       mockWeather(),
-		Items:         mockItems(req.TripType),
-	}
-
-	c.JSON(http.StatusCreated, response)
+		Weather:       weather,
+		Items:         dbItemsToResponse(dbItems),
+	})
 }
 
-// mockWeather returns a fixed weather snapshot for Lesson 1 testing.
-// TODO (Lesson 2): Replace with real Open-Meteo forecast data.
+// GetTrip handles GET /api/trips/:uuid.
+func (h *Handler) GetTrip(c *gin.Context) {
+	tripUUID := c.Param("uuid")
+	ctx := context.Background()
+
+	trip, err := h.q.GetTripByID(ctx, tripUUID)
+	if err == sql.ErrNoRows {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error":   "trip_not_found",
+			"message": "No trip found with that ID.",
+		})
+		return
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Failed to retrieve trip."})
+		return
+	}
+
+	var activities []string
+	if err := json.Unmarshal(trip.Activities, &activities); err != nil {
+		activities = []string{}
+	}
+
+	// Weather is optional — nil if not found (is_forecast: false trips won't have one in the future).
+	var weatherResp *models.WeatherResponse
+	ws, err := h.q.GetWeatherByTripID(ctx, tripUUID)
+	if err == nil {
+		var forecast []models.DailyForecast
+		json.Unmarshal(ws.DailyForecast, &forecast)
+		weatherResp = &models.WeatherResponse{
+			TempMinF:      int(ws.TempMinF),
+			TempMaxF:      int(ws.TempMaxF),
+			RainDays:      int(ws.RainDays),
+			SnowDays:      int(ws.SnowDays),
+			IsForecast:    ws.IsForecast,
+			DailyForecast: forecast,
+		}
+	}
+
+	dbItems, err := h.q.GetItemsByTripID(ctx, tripUUID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Failed to retrieve packing items."})
+		return
+	}
+
+	durationDays := int(trip.ReturnDate.Sub(trip.DepartureDate).Hours()/24) + 1
+
+	c.JSON(http.StatusOK, models.TripResponse{
+		ID:            trip.ID,
+		Destination:   trip.Destination,
+		DepartureDate: trip.DepartureDate.Format("2006-01-02"),
+		ReturnDate:    trip.ReturnDate.Format("2006-01-02"),
+		TripType:      trip.TripType,
+		Companions:    trip.Companions,
+		Activities:    activities,
+		DurationDays:  durationDays,
+		CreatedAt:     trip.CreatedAt,
+		Weather:       weatherResp,
+		Items:         dbItemsToResponse(dbItems),
+	})
+}
+
+// UpdateItemCheckbox handles PATCH /api/trips/:uuid/items/:itemId.
+func (h *Handler) UpdateItemCheckbox(c *gin.Context) {
+	tripUUID := c.Param("uuid")
+	itemIDStr := c.Param("itemId")
+	ctx := context.Background()
+
+	// Verify trip exists.
+	if _, err := h.q.GetTripByID(ctx, tripUUID); err == sql.ErrNoRows {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error":   "trip_not_found",
+			"message": "No trip found with that ID.",
+		})
+		return
+	} else if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Failed to verify trip."})
+		return
+	}
+
+	itemID, err := strconv.Atoi(itemIDStr)
+	if err != nil || itemID < 1 {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error":   "item_not_found",
+			"message": "No item found with that ID for this trip.",
+		})
+		return
+	}
+
+	var req models.UpdateItemRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "invalid_request",
+			"message": "Request body must be JSON with an is_checked boolean field.",
+		})
+		return
+	}
+
+	if err := h.q.UpdateItemChecked(ctx, dbpkg.UpdateItemCheckedParams{
+		IsChecked: req.IsChecked,
+		ID:        int32(itemID),
+		TripID:    tripUUID,
+	}); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Failed to update item."})
+		return
+	}
+
+	c.JSON(http.StatusOK, models.UpdateItemResponse{
+		ID:        itemID,
+		IsChecked: req.IsChecked,
+	})
+}
+
+// dbItemsToResponse converts sqlc PackingItem rows to the API response type.
+func dbItemsToResponse(rows []dbpkg.PackingItem) []models.PackingItem {
+	out := make([]models.PackingItem, len(rows))
+	for i, r := range rows {
+		out[i] = models.PackingItem{
+			ID:          int(r.ID),
+			Name:        r.Name,
+			Category:    r.Category,
+			IsEssential: r.IsEssential,
+			Reason:      r.Reason.String,
+			IsChecked:   r.IsChecked,
+			SortOrder:   int(r.SortOrder),
+		}
+	}
+	return out
+}
+
+// mockWeather returns a fixed weather snapshot until Open-Meteo integration is added.
+// TODO (Lesson 2 — weather): Replace with real Open-Meteo forecast data.
 func mockWeather() *models.WeatherResponse {
 	return &models.WeatherResponse{
 		TempMinF:   52,
@@ -124,92 +310,32 @@ func mockWeather() *models.WeatherResponse {
 	}
 }
 
-// mockItems returns a small packing list based on trip type for Lesson 1 testing.
-// TODO (Lesson 2): Replace with real rule engine output.
+// mockItems returns a small packing list based on trip type until the rule engine is added.
+// TODO (Lesson 2 — rules): Replace with real rule engine output.
 func mockItems(tripType string) []models.PackingItem {
 	items := []models.PackingItem{
-		{ID: 1, Name: "Prescriptions", Category: "Essential Items", IsEssential: true, Reason: "Never travel without your medications", IsChecked: false, SortOrder: 1},
-		{ID: 2, Name: "Phone charger", Category: "Electronics", IsEssential: false, Reason: "Keep your phone powered", IsChecked: false, SortOrder: 65},
-		{ID: 3, Name: "Toothbrush + toothpaste", Category: "Toiletries", IsEssential: false, Reason: "Daily essential", IsChecked: false, SortOrder: 40},
+		{Name: "Prescriptions", Category: "Essential Items", IsEssential: true, Reason: "Never travel without your medications", SortOrder: 1},
+		{Name: "Phone charger", Category: "Electronics", IsEssential: false, Reason: "Keep your phone powered", SortOrder: 65},
+		{Name: "Toothbrush + toothpaste", Category: "Toiletries", IsEssential: false, Reason: "Daily essential", SortOrder: 40},
 	}
 
 	switch tripType {
 	case "international":
 		items = append([]models.PackingItem{
-			{ID: 4, Name: "Passport", Category: "Essential Items", IsEssential: true, Reason: "Required for international travel", IsChecked: false, SortOrder: 0},
-			{ID: 5, Name: "Power adapter", Category: "Essential Items", IsEssential: true, Reason: "Different outlets abroad", IsChecked: false, SortOrder: 2},
+			{Name: "Passport", Category: "Essential Items", IsEssential: true, Reason: "Required for international travel", SortOrder: 0},
+			{Name: "Power adapter", Category: "Essential Items", IsEssential: true, Reason: "Different outlets abroad", SortOrder: 2},
 		}, items...)
 	case "beach":
 		items = append(items,
-			models.PackingItem{ID: 4, Name: "Swimsuit", Category: "Clothing", IsEssential: false, Reason: "Beach trip essential", IsChecked: false, SortOrder: 20},
-			models.PackingItem{ID: 5, Name: "Sunscreen (SPF 30+)", Category: "Essential Items", IsEssential: true, Reason: "Protect your skin at the beach", IsChecked: false, SortOrder: 3},
+			models.PackingItem{Name: "Swimsuit", Category: "Clothing", IsEssential: false, Reason: "Beach trip essential", SortOrder: 20},
+			models.PackingItem{Name: "Sunscreen (SPF 30+)", Category: "Essential Items", IsEssential: true, Reason: "Protect your skin at the beach", SortOrder: 3},
 		)
 	case "cold_weather":
 		items = append(items,
-			models.PackingItem{ID: 4, Name: "Heavy coat", Category: "Clothing", IsEssential: false, Reason: "Cold weather essential", IsChecked: false, SortOrder: 20},
-			models.PackingItem{ID: 5, Name: "Gloves", Category: "Clothing", IsEssential: false, Reason: "Keep hands warm", IsChecked: false, SortOrder: 21},
+			models.PackingItem{Name: "Heavy coat", Category: "Clothing", IsEssential: false, Reason: "Cold weather essential", SortOrder: 20},
+			models.PackingItem{Name: "Gloves", Category: "Clothing", IsEssential: false, Reason: "Keep hands warm", SortOrder: 21},
 		)
 	}
 
 	return items
-}
-
-// GetTrip handles GET /api/trips/:uuid
-// TODO (Lesson 2): Replace mock data with a real database lookup.
-func GetTrip(c *gin.Context) {
-	uuid := c.Param("uuid")
-
-	if uuid != mockTripID {
-		c.JSON(http.StatusNotFound, gin.H{
-			"error":   "trip_not_found",
-			"message": "No trip found with that ID.",
-		})
-		return
-	}
-
-	c.JSON(http.StatusOK, mockTrip)
-}
-
-// UpdateItemCheckbox handles PATCH /api/trips/:uuid/items/:itemId
-// TODO (Lesson 2): Verify item belongs to trip and update is_checked in MySQL.
-func UpdateItemCheckbox(c *gin.Context) {
-	tripUUID := c.Param("uuid")
-	itemIDStr := c.Param("itemId")
-
-	// Verify trip exists (mock: only the hardcoded UUID is valid)
-	if tripUUID != mockTripID {
-		c.JSON(http.StatusNotFound, gin.H{
-			"error":   "trip_not_found",
-			"message": "No trip found with that ID.",
-		})
-		return
-	}
-
-	// Parse item ID
-	itemID, err := strconv.Atoi(itemIDStr)
-	if err != nil || itemID < 1 {
-		c.JSON(http.StatusNotFound, gin.H{
-			"error":   "item_not_found",
-			"message": "No item found with that ID for this trip.",
-		})
-		return
-	}
-
-	// Validate request body
-	var req models.UpdateItemRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "invalid_request",
-			"message": "Request body must be JSON with an is_checked boolean field.",
-		})
-		return
-	}
-
-	// TODO (Lesson 2): Verify item ID exists in packing_items and belongs to this trip.
-	// TODO (Lesson 2): UPDATE packing_items SET is_checked = ? WHERE id = ? AND trip_id = ?
-
-	c.JSON(http.StatusOK, models.UpdateItemResponse{
-		ID:        itemID,
-		IsChecked: req.IsChecked,
-	})
 }
