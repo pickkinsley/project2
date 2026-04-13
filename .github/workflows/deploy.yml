@@ -17,8 +17,8 @@ jobs:
 
       # -------------------------------------------------------
       # 2. Build frontend
-      # TODO (Module 5): Uncomment these steps once the React app
-      # is scaffolded in Issue #11. Disabled for Module 4 submission.
+      # TODO (Module 6): Uncomment these steps once the React app
+      # is scaffolded in Issue #11.
       # -------------------------------------------------------
       # - name: Set up Node.js
       #   uses: actions/setup-node@v4
@@ -64,7 +64,7 @@ jobs:
 
       # -------------------------------------------------------
       # 5. Deploy frontend
-      # TODO (Module 5): Uncomment once frontend is built in Issue #11.
+      # TODO (Module 6): Uncomment once frontend is built in Issue #11.
       # -------------------------------------------------------
       # - name: Deploy frontend to /var/www/packsmart
       #   run: |
@@ -85,20 +85,9 @@ jobs:
       - name: Restart backend service
         run: |
           ssh -i ~/.ssh/lightsail.pem ubuntu@${{ secrets.SERVER_IP }} << 'EOF'
-            # Atomic swap: put new binary in place
             mv /home/ubuntu/packsmart-backend/server.new \
                /home/ubuntu/packsmart-backend/server
             chmod +x /home/ubuntu/packsmart-backend/server
-
-            # Restart: prefer systemd, fall back to nohup
-            if systemctl is-active --quiet packsmart; then
-              sudo systemctl restart packsmart
-            else
-              pkill -f "packsmart-backend/server" || true
-              sleep 1
-              cd /home/ubuntu/packsmart-backend
-              nohup ./server > server.log 2>&1 &
-            fi
-
+            sudo systemctl restart packsmart-backend
             echo "Backend restarted successfully"
           EOF
