@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -30,8 +31,11 @@ func NewHandler(sqlDB *sql.DB, q *dbpkg.Queries) *Handler {
 // TODO (Lesson 2 — weather): Replace mockWeather() with real Open-Meteo forecast.
 // TODO (Lesson 2 — rules): Replace mockItems() with real rule engine output.
 func (h *Handler) CreateTrip(c *gin.Context) {
+	log.Printf("[INFO] POST /api/trips - Creating new trip")
+
 	var req models.CreateTripRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Printf("[ERROR] POST /api/trips - Invalid request body: %v", err)
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error":   "invalid_request",
 			"message": err.Error(),
@@ -41,6 +45,7 @@ func (h *Handler) CreateTrip(c *gin.Context) {
 
 	departure, err := time.Parse("2006-01-02", req.DepartureDate)
 	if err != nil {
+		log.Printf("[ERROR] POST /api/trips - Invalid departure_date: %v", err)
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error":   "invalid_request",
 			"message": "departure_date must be in YYYY-MM-DD format.",
@@ -49,6 +54,7 @@ func (h *Handler) CreateTrip(c *gin.Context) {
 	}
 	returnDate, err := time.Parse("2006-01-02", req.ReturnDate)
 	if err != nil {
+		log.Printf("[ERROR] POST /api/trips - Invalid return_date: %v", err)
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error":   "invalid_request",
 			"message": "return_date must be in YYYY-MM-DD format.",
@@ -56,6 +62,7 @@ func (h *Handler) CreateTrip(c *gin.Context) {
 		return
 	}
 	if !returnDate.After(departure) {
+		log.Printf("[ERROR] POST /api/trips - return_date not after departure_date")
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error":   "invalid_request",
 			"message": "return_date must be after departure_date.",
@@ -67,8 +74,11 @@ func (h *Handler) CreateTrip(c *gin.Context) {
 	tripID := uuid.New().String()
 	ctx := context.Background()
 
+	log.Printf("[DEBUG] POST /api/trips - Destination: %q, TripType: %q, Duration: %d days", req.Destination, req.TripType, durationDays)
+
 	activitiesJSON, err := json.Marshal(req.Activities)
 	if err != nil {
+		log.Printf("[ERROR] POST /api/trips - Failed to encode activities: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Failed to encode activities."})
 		return
 	}
@@ -78,13 +88,16 @@ func (h *Handler) CreateTrip(c *gin.Context) {
 
 	forecastJSON, err := json.Marshal(weather.DailyForecast)
 	if err != nil {
+		log.Printf("[ERROR] POST /api/trips - Failed to encode forecast: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Failed to encode forecast."})
 		return
 	}
 
 	// Write trip, weather, and items in a single transaction.
+	log.Printf("[DEBUG] POST /api/trips - Beginning transaction for trip %s", tripID)
 	tx, err := h.db.Begin()
 	if err != nil {
+		log.Printf("[ERROR] POST /api/trips - Failed to start transaction: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Failed to start transaction."})
 		return
 	}
@@ -102,9 +115,11 @@ func (h *Handler) CreateTrip(c *gin.Context) {
 		Activities:    json.RawMessage(activitiesJSON),
 	}); err != nil {
 		tx.Rollback()
+		log.Printf("[ERROR] POST /api/trips - InsertTrip failed: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Failed to save trip."})
 		return
 	}
+	log.Printf("[DEBUG] POST /api/trips - Trip row inserted")
 
 	if err := qtx.InsertWeatherSnapshot(ctx, dbpkg.InsertWeatherSnapshotParams{
 		TripID:        tripID,
@@ -116,9 +131,11 @@ func (h *Handler) CreateTrip(c *gin.Context) {
 		DailyForecast: json.RawMessage(forecastJSON),
 	}); err != nil {
 		tx.Rollback()
+		log.Printf("[ERROR] POST /api/trips - InsertWeatherSnapshot failed: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Failed to save weather."})
 		return
 	}
+	log.Printf("[DEBUG] POST /api/trips - Weather snapshot inserted")
 
 	for _, item := range items {
 		if err := qtx.InsertPackingItem(ctx, dbpkg.InsertPackingItemParams{
@@ -131,12 +148,15 @@ func (h *Handler) CreateTrip(c *gin.Context) {
 			SortOrder:   int32(item.SortOrder),
 		}); err != nil {
 			tx.Rollback()
+			log.Printf("[ERROR] POST /api/trips - InsertPackingItem %q failed: %v", item.Name, err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Failed to save packing items."})
 			return
 		}
 	}
+	log.Printf("[DEBUG] POST /api/trips - %d packing items inserted", len(items))
 
 	if err := tx.Commit(); err != nil {
+		log.Printf("[ERROR] POST /api/trips - Transaction commit failed: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Failed to commit transaction."})
 		return
 	}
@@ -144,9 +164,13 @@ func (h *Handler) CreateTrip(c *gin.Context) {
 	// Fetch items back to get their auto-assigned IDs.
 	dbItems, err := h.q.GetItemsByTripID(ctx, tripID)
 	if err != nil {
+		log.Printf("[ERROR] POST /api/trips - GetItemsByTripID failed: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Failed to retrieve packing items."})
 		return
 	}
+
+	log.Printf("[INFO] Trip created with ID: %s", tripID)
+	log.Printf("[INFO] POST /api/trips - Returning 201")
 
 	c.JSON(http.StatusCreated, models.TripResponse{
 		ID:            tripID,
@@ -166,10 +190,12 @@ func (h *Handler) CreateTrip(c *gin.Context) {
 // GetTrip handles GET /api/trips/:uuid.
 func (h *Handler) GetTrip(c *gin.Context) {
 	tripUUID := c.Param("uuid")
+	log.Printf("[INFO] GET /api/trips/%s - Fetching trip", tripUUID)
 	ctx := context.Background()
 
 	trip, err := h.q.GetTripByID(ctx, tripUUID)
 	if err == sql.ErrNoRows {
+		log.Printf("[INFO] GET /api/trips/%s - Trip not found, returning 404", tripUUID)
 		c.JSON(http.StatusNotFound, gin.H{
 			"error":   "trip_not_found",
 			"message": "No trip found with that ID.",
@@ -177,9 +203,11 @@ func (h *Handler) GetTrip(c *gin.Context) {
 		return
 	}
 	if err != nil {
+		log.Printf("[ERROR] GET /api/trips/%s - GetTripByID failed: %v", tripUUID, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Failed to retrieve trip."})
 		return
 	}
+	log.Printf("[DEBUG] GET /api/trips/%s - Trip found: %q", tripUUID, trip.Destination)
 
 	var activities []string
 	if err := json.Unmarshal(trip.Activities, &activities); err != nil {
@@ -190,6 +218,7 @@ func (h *Handler) GetTrip(c *gin.Context) {
 	var weatherResp *models.WeatherResponse
 	ws, err := h.q.GetWeatherByTripID(ctx, tripUUID)
 	if err == nil {
+		log.Printf("[DEBUG] GET /api/trips/%s - Weather snapshot found", tripUUID)
 		var forecast []models.DailyForecast
 		json.Unmarshal(ws.DailyForecast, &forecast)
 		weatherResp = &models.WeatherResponse{
@@ -200,16 +229,21 @@ func (h *Handler) GetTrip(c *gin.Context) {
 			IsForecast:    ws.IsForecast,
 			DailyForecast: forecast,
 		}
+	} else if err != sql.ErrNoRows {
+		log.Printf("[ERROR] GET /api/trips/%s - GetWeatherByTripID failed: %v", tripUUID, err)
 	}
 
 	dbItems, err := h.q.GetItemsByTripID(ctx, tripUUID)
 	if err != nil {
+		log.Printf("[ERROR] GET /api/trips/%s - GetItemsByTripID failed: %v", tripUUID, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Failed to retrieve packing items."})
 		return
 	}
+	log.Printf("[DEBUG] GET /api/trips/%s - Fetched %d packing items", tripUUID, len(dbItems))
 
 	durationDays := int(trip.ReturnDate.Sub(trip.DepartureDate).Hours()/24) + 1
 
+	log.Printf("[INFO] GET /api/trips/%s - Returning 200", tripUUID)
 	c.JSON(http.StatusOK, models.TripResponse{
 		ID:            trip.ID,
 		Destination:   trip.Destination,
@@ -229,22 +263,26 @@ func (h *Handler) GetTrip(c *gin.Context) {
 func (h *Handler) UpdateItemCheckbox(c *gin.Context) {
 	tripUUID := c.Param("uuid")
 	itemIDStr := c.Param("itemId")
+	log.Printf("[INFO] PATCH /api/trips/%s/items/%s - Updating item checkbox", tripUUID, itemIDStr)
 	ctx := context.Background()
 
 	// Verify trip exists.
 	if _, err := h.q.GetTripByID(ctx, tripUUID); err == sql.ErrNoRows {
+		log.Printf("[INFO] PATCH /api/trips/%s/items/%s - Trip not found, returning 404", tripUUID, itemIDStr)
 		c.JSON(http.StatusNotFound, gin.H{
 			"error":   "trip_not_found",
 			"message": "No trip found with that ID.",
 		})
 		return
 	} else if err != nil {
+		log.Printf("[ERROR] PATCH /api/trips/%s/items/%s - GetTripByID failed: %v", tripUUID, itemIDStr, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Failed to verify trip."})
 		return
 	}
 
 	itemID, err := strconv.Atoi(itemIDStr)
 	if err != nil || itemID < 1 {
+		log.Printf("[ERROR] PATCH /api/trips/%s/items/%s - Invalid item ID", tripUUID, itemIDStr)
 		c.JSON(http.StatusNotFound, gin.H{
 			"error":   "item_not_found",
 			"message": "No item found with that ID for this trip.",
@@ -254,6 +292,7 @@ func (h *Handler) UpdateItemCheckbox(c *gin.Context) {
 
 	var req models.UpdateItemRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Printf("[ERROR] PATCH /api/trips/%s/items/%d - Invalid request body: %v", tripUUID, itemID, err)
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error":   "invalid_request",
 			"message": "Request body must be JSON with an is_checked boolean field.",
@@ -266,10 +305,12 @@ func (h *Handler) UpdateItemCheckbox(c *gin.Context) {
 		ID:        int32(itemID),
 		TripID:    tripUUID,
 	}); err != nil {
+		log.Printf("[ERROR] PATCH /api/trips/%s/items/%d - UpdateItemChecked failed: %v", tripUUID, itemID, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Failed to update item."})
 		return
 	}
 
+	log.Printf("[INFO] PATCH /api/trips/%s/items/%d - is_checked set to %v, returning 200", tripUUID, itemID, req.IsChecked)
 	c.JSON(http.StatusOK, models.UpdateItemResponse{
 		ID:        itemID,
 		IsChecked: req.IsChecked,
