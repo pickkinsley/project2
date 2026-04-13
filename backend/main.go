@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"log"
+	"os"
 
 	"github.com/gin-gonic/gin"
 	_ "github.com/go-sql-driver/mysql"
@@ -10,9 +11,12 @@ import (
 	"github.com/pickkinsley/project2/backend/handlers"
 )
 
-const dsn = "packsmart_user:Dogs1234@tcp(localhost)/packsmart?parseTime=true"
-
 func main() {
+	dsn := os.Getenv("DB_DSN")
+	if dsn == "" {
+		dsn = "packsmart_user:Dogs1234@tcp(localhost)/packsmart?parseTime=true"
+	}
+
 	sqlDB, err := sql.Open("mysql", dsn)
 	if err != nil {
 		log.Fatalf("Failed to open database: %v", err)
