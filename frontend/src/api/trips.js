@@ -1,21 +1,33 @@
 const BASE = '/api'
 
+async function parseResponse(res) {
+  const text = await res.text()
+  if (!text) {
+    if (res.ok) return {}
+    throw new Error(`Server error: ${res.status}`)
+  }
+  try {
+    const data = JSON.parse(text)
+    if (!res.ok) throw data
+    return data
+  } catch (e) {
+    if (!res.ok) throw new Error(`Server error: ${res.status}`)
+    throw e
+  }
+}
+
 export async function createTrip(formData) {
   const res = await fetch(`${BASE}/trips`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(formData),
   })
-  const data = await res.json()
-  if (!res.ok) throw data
-  return data
+  return parseResponse(res)
 }
 
 export async function getTrip(tripId) {
   const res = await fetch(`${BASE}/trips/${tripId}`)
-  const data = await res.json()
-  if (!res.ok) throw data
-  return data
+  return parseResponse(res)
 }
 
 export async function updateItemChecked(tripId, itemId, isChecked) {
@@ -24,7 +36,5 @@ export async function updateItemChecked(tripId, itemId, isChecked) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ is_checked: isChecked }),
   })
-  const data = await res.json()
-  if (!res.ok) throw data
-  return data
+  return parseResponse(res)
 }
