@@ -317,6 +317,139 @@ func (h *Handler) UpdateItemCheckbox(c *gin.Context) {
 	})
 }
 
+// UpdateTrip handles PUT /api/trips/:uuid.
+func (h *Handler) UpdateTrip(c *gin.Context) {
+	tripUUID := c.Param("uuid")
+	log.Printf("[INFO] PUT /api/trips/%s - Updating trip", tripUUID)
+	ctx := context.Background()
+
+	// Verify trip exists.
+	if _, err := h.q.GetTripByID(ctx, tripUUID); err == sql.ErrNoRows {
+		log.Printf("[INFO] PUT /api/trips/%s - Trip not found, returning 404", tripUUID)
+		c.JSON(http.StatusNotFound, gin.H{"error": "trip_not_found", "message": "No trip found with that ID."})
+		return
+	} else if err != nil {
+		log.Printf("[ERROR] PUT /api/trips/%s - GetTripByID failed: %v", tripUUID, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Failed to verify trip."})
+		return
+	}
+
+	var req models.CreateTripRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Printf("[ERROR] PUT /api/trips/%s - Invalid request body: %v", tripUUID, err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request", "message": err.Error()})
+		return
+	}
+
+	departure, err := time.Parse("2006-01-02", req.DepartureDate)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request", "message": "departure_date must be in YYYY-MM-DD format."})
+		return
+	}
+	returnDate, err := time.Parse("2006-01-02", req.ReturnDate)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request", "message": "return_date must be in YYYY-MM-DD format."})
+		return
+	}
+	if !returnDate.After(departure) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request", "message": "return_date must be after departure_date."})
+		return
+	}
+
+	activitiesJSON, err := json.Marshal(req.Activities)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Failed to encode activities."})
+		return
+	}
+
+	if err := h.q.UpdateTrip(ctx, dbpkg.UpdateTripParams{
+		ID:            tripUUID,
+		Destination:   req.Destination,
+		DestLat:       "0.000000",
+		DestLon:       "0.000000",
+		DepartureDate: departure,
+		ReturnDate:    returnDate,
+		TripType:      req.TripType,
+		Companions:    req.Companions,
+		Activities:    json.RawMessage(activitiesJSON),
+	}); err != nil {
+		log.Printf("[ERROR] PUT /api/trips/%s - UpdateTrip failed: %v", tripUUID, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Failed to update trip."})
+		return
+	}
+
+	// Fetch the full updated trip to return.
+	trip, err := h.q.GetTripByID(ctx, tripUUID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Failed to retrieve updated trip."})
+		return
+	}
+	var activities []string
+	json.Unmarshal(trip.Activities, &activities)
+
+	var weatherResp *models.WeatherResponse
+	ws, err := h.q.GetWeatherByTripID(ctx, tripUUID)
+	if err == nil {
+		var forecast []models.DailyForecast
+		json.Unmarshal(ws.DailyForecast, &forecast)
+		weatherResp = &models.WeatherResponse{
+			TempMinF: int(ws.TempMinF), TempMaxF: int(ws.TempMaxF),
+			RainDays: int(ws.RainDays), SnowDays: int(ws.SnowDays),
+			IsForecast: ws.IsForecast, DailyForecast: forecast,
+		}
+	}
+
+	dbItems, err := h.q.GetItemsByTripID(ctx, tripUUID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Failed to retrieve packing items."})
+		return
+	}
+
+	durationDays := int(trip.ReturnDate.Sub(trip.DepartureDate).Hours()/24) + 1
+	log.Printf("[INFO] PUT /api/trips/%s - Updated successfully, returning 200", tripUUID)
+	c.JSON(http.StatusOK, models.TripResponse{
+		ID:            trip.ID,
+		Destination:   trip.Destination,
+		DepartureDate: trip.DepartureDate.Format("2006-01-02"),
+		ReturnDate:    trip.ReturnDate.Format("2006-01-02"),
+		TripType:      trip.TripType,
+		Companions:    trip.Companions,
+		Activities:    activities,
+		DurationDays:  durationDays,
+		CreatedAt:     trip.CreatedAt,
+		Weather:       weatherResp,
+		Items:         dbItemsToResponse(dbItems),
+	})
+}
+
+// DeleteTrip handles DELETE /api/trips/:uuid.
+// ON DELETE CASCADE in the schema removes packing_items and weather_snapshots automatically.
+func (h *Handler) DeleteTrip(c *gin.Context) {
+	tripUUID := c.Param("uuid")
+	log.Printf("[INFO] DELETE /api/trips/%s - Deleting trip", tripUUID)
+	ctx := context.Background()
+
+	// Verify trip exists before deleting.
+	if _, err := h.q.GetTripByID(ctx, tripUUID); err == sql.ErrNoRows {
+		log.Printf("[INFO] DELETE /api/trips/%s - Trip not found, returning 404", tripUUID)
+		c.JSON(http.StatusNotFound, gin.H{"error": "trip_not_found", "message": "No trip found with that ID."})
+		return
+	} else if err != nil {
+		log.Printf("[ERROR] DELETE /api/trips/%s - GetTripByID failed: %v", tripUUID, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Failed to verify trip."})
+		return
+	}
+
+	if err := h.q.DeleteTrip(ctx, tripUUID); err != nil {
+		log.Printf("[ERROR] DELETE /api/trips/%s - DeleteTrip failed: %v", tripUUID, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Failed to delete trip."})
+		return
+	}
+
+	log.Printf("[INFO] DELETE /api/trips/%s - Deleted successfully, returning 204", tripUUID)
+	c.Status(http.StatusNoContent)
+}
+
 // dbItemsToResponse converts sqlc PackingItem rows to the API response type.
 func dbItemsToResponse(rows []dbpkg.PackingItem) []models.PackingItem {
 	out := make([]models.PackingItem, len(rows))

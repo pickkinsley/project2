@@ -11,6 +11,15 @@ import (
 	"time"
 )
 
+const deleteTrip = `-- name: DeleteTrip :exec
+DELETE FROM trips WHERE id = ?
+`
+
+func (q *Queries) DeleteTrip(ctx context.Context, id string) error {
+	_, err := q.db.ExecContext(ctx, deleteTrip, id)
+	return err
+}
+
 const getTripByID = `-- name: GetTripByID :one
 SELECT id, destination, dest_lat, dest_lon, departure_date, return_date, trip_type, companions, activities, created_at
 FROM trips
@@ -63,6 +72,41 @@ func (q *Queries) InsertTrip(ctx context.Context, arg InsertTripParams) error {
 		arg.TripType,
 		arg.Companions,
 		arg.Activities,
+	)
+	return err
+}
+
+const updateTrip = `-- name: UpdateTrip :exec
+UPDATE trips
+SET destination = ?, dest_lat = ?, dest_lon = ?,
+    departure_date = ?, return_date = ?,
+    trip_type = ?, companions = ?, activities = ?
+WHERE id = ?
+`
+
+type UpdateTripParams struct {
+	Destination   string          `json:"destination"`
+	DestLat       string          `json:"dest_lat"`
+	DestLon       string          `json:"dest_lon"`
+	DepartureDate time.Time       `json:"departure_date"`
+	ReturnDate    time.Time       `json:"return_date"`
+	TripType      string          `json:"trip_type"`
+	Companions    string          `json:"companions"`
+	Activities    json.RawMessage `json:"activities"`
+	ID            string          `json:"id"`
+}
+
+func (q *Queries) UpdateTrip(ctx context.Context, arg UpdateTripParams) error {
+	_, err := q.db.ExecContext(ctx, updateTrip,
+		arg.Destination,
+		arg.DestLat,
+		arg.DestLon,
+		arg.DepartureDate,
+		arg.ReturnDate,
+		arg.TripType,
+		arg.Companions,
+		arg.Activities,
+		arg.ID,
 	)
 	return err
 }

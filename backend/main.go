@@ -38,6 +38,8 @@ func main() {
 		api.GET("/health", handlers.Health)
 		api.POST("/trips", h.CreateTrip)
 		api.GET("/trips/:uuid", h.GetTrip)
+		api.PUT("/trips/:uuid", h.UpdateTrip)
+		api.DELETE("/trips/:uuid", h.DeleteTrip)
 		api.PATCH("/trips/:uuid/items/:itemId", h.UpdateItemCheckbox)
 	}
 
