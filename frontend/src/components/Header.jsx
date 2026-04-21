@@ -19,8 +19,8 @@ export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false)
 
   const linkClass = ({ isActive }) =>
-    `text-sm font-semibold transition-colors ${
-      isActive ? 'text-white' : 'text-white/80 hover:text-white'
+    `text-sm font-bold transition-colors ${
+      isActive ? 'text-black' : 'text-black/70 hover:text-black'
     }`
 
   return (
@@ -84,8 +84,8 @@ export default function Header() {
               className={({ isActive }) =>
                 `block px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${
                   isActive
-                    ? 'bg-white/30 text-white'
-                    : 'text-white/80 hover:bg-white/20 hover:text-white'
+                    ? 'bg-white/30 text-black'
+                    : 'text-black/70 hover:bg-white/20 hover:text-black'
                 }`
               }
               style={TEXT_SHADOW}
