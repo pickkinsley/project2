@@ -20,7 +20,7 @@ export default function Header() {
 
   const linkClass = ({ isActive }) =>
     `text-sm font-semibold transition-colors ${
-      isActive ? 'text-rose-700' : 'text-gray-700 hover:text-rose-600'
+      isActive ? 'text-white' : 'text-white/80 hover:text-white'
     }`
 
   return (
@@ -32,7 +32,7 @@ export default function Header() {
         {/* Brand */}
         <Link
           to="/"
-          className="flex items-center gap-2 font-bold text-gray-800 hover:text-rose-700 transition-colors"
+          className="flex items-center gap-2 font-bold text-white hover:text-white/80 transition-colors"
           style={TEXT_SHADOW}
         >
           <span className="text-xl">🎒</span>
@@ -56,7 +56,7 @@ export default function Header() {
 
         {/* Mobile hamburger */}
         <button
-          className="sm:hidden p-2 rounded-md text-gray-700 hover:text-rose-700 transition-colors"
+          className="sm:hidden p-2 rounded-md text-white hover:text-white/80 transition-colors"
           style={TEXT_SHADOW}
           onClick={() => setMenuOpen((o) => !o)}
           aria-label="Toggle menu"
@@ -84,8 +84,8 @@ export default function Header() {
               className={({ isActive }) =>
                 `block px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${
                   isActive
-                    ? 'bg-white/50 text-rose-700'
-                    : 'text-gray-700 hover:bg-white/40 hover:text-rose-600'
+                    ? 'bg-white/30 text-white'
+                    : 'text-white/80 hover:bg-white/20 hover:text-white'
                 }`
               }
               style={TEXT_SHADOW}
