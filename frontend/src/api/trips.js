@@ -30,6 +30,22 @@ export async function getTrip(tripId) {
   return parseResponse(res)
 }
 
+export async function updateTrip(tripId, formData) {
+  const res = await fetch(`${BASE}/trips/${tripId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(formData),
+  })
+  return parseResponse(res)
+}
+
+export async function deleteTrip(tripId) {
+  const res = await fetch(`${BASE}/trips/${tripId}`, {
+    method: 'DELETE',
+  })
+  return parseResponse(res)
+}
+
 export async function updateItemChecked(tripId, itemId, isChecked) {
   const res = await fetch(`${BASE}/trips/${tripId}/items/${itemId}`, {
     method: 'PATCH',
