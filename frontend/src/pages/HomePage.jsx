@@ -19,12 +19,26 @@ const COMPANIONS = [
 ]
 
 const ACTIVITIES = [
-  { value: 'sightseeing', label: 'Sightseeing' },
-  { value: 'beach',       label: 'Beach' },
-  { value: 'hiking',      label: 'Hiking' },
-  { value: 'fine_dining', label: 'Fine Dining' },
-  { value: 'shopping',    label: 'Shopping' },
-  { value: 'nightlife',   label: 'Nightlife' },
+  { value: 'sightseeing',       label: 'Sightseeing' },
+  { value: 'beach',             label: 'Beach' },
+  { value: 'hiking',            label: 'Hiking' },
+  { value: 'fine_dining',       label: 'Fine Dining' },
+  { value: 'shopping',          label: 'Shopping' },
+  { value: 'nightlife',         label: 'Nightlife' },
+  { value: 'adventure_sports',  label: 'Adventure Sports' },
+  { value: 'skiing',            label: 'Skiing/Snowboarding' },
+  { value: 'water_sports',      label: 'Water Sports' },
+  { value: 'photography',       label: 'Photography' },
+  { value: 'museums',           label: 'Museums & Culture' },
+  { value: 'food_tours',        label: 'Food Tours' },
+  { value: 'spa',               label: 'Spa & Wellness' },
+  { value: 'business',          label: 'Business Meetings' },
+  { value: 'concerts',          label: 'Concerts/Events' },
+  { value: 'theme_parks',       label: 'Theme Parks' },
+  { value: 'camping',           label: 'Camping' },
+  { value: 'road_trip',         label: 'Road Trip' },
+  { value: 'wine_tasting',      label: 'Wine Tasting' },
+  { value: 'festivals',         label: 'Festivals' },
 ]
 
 const EMPTY_FORM = {
@@ -200,7 +214,7 @@ export default function HomePage() {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Activities <span className="text-pink-500">*</span>
             </label>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {ACTIVITIES.map((a) => {
                 const checked = form.activities.includes(a.value)
                 return (
