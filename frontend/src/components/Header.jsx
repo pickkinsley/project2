@@ -8,29 +8,33 @@ const NAV_LINKS = [
   { to: '/how-it-works', label: 'How It Works' },
 ]
 
+const STRIPE_BG = {
+  background:
+    'repeating-linear-gradient(90deg, #fecdd3 0px, #fecdd3 24px, #bbf7d0 24px, #bbf7d0 48px)',
+}
+
+const TEXT_SHADOW = { textShadow: '0 1px 3px rgba(255,255,255,0.8)' }
+
 export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false)
 
   const linkClass = ({ isActive }) =>
-    `text-sm font-medium transition-colors ${
-      isActive ? 'text-pink-600' : 'text-gray-600 hover:text-pink-500'
+    `text-sm font-semibold transition-colors ${
+      isActive ? 'text-rose-700' : 'text-gray-700 hover:text-rose-600'
     }`
 
   return (
-    <header className="sticky top-0 z-50 bg-white shadow-sm">
-      {/* Pink + green stripe bar */}
-      <div
-        className="h-2"
-        style={{
-          background:
-            'repeating-linear-gradient(90deg, #fda4af 0px, #fda4af 20px, #86efac 20px, #86efac 40px)',
-        }}
-      />
+    <header className="sticky top-0 z-50 shadow-sm" style={STRIPE_BG}>
 
-      <div className="max-w-5xl mx-auto px-4 h-13 flex items-center justify-between py-2">
+      {/* Main nav row */}
+      <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
 
         {/* Brand */}
-        <Link to="/" className="flex items-center gap-2 font-bold text-gray-900 hover:text-pink-600 transition-colors">
+        <Link
+          to="/"
+          className="flex items-center gap-2 font-bold text-gray-800 hover:text-rose-700 transition-colors"
+          style={TEXT_SHADOW}
+        >
           <span className="text-xl">🎒</span>
           <span>PackSmart</span>
         </Link>
@@ -38,7 +42,13 @@ export default function Header() {
         {/* Desktop nav */}
         <nav className="hidden sm:flex items-center gap-6">
           {NAV_LINKS.map(({ to, label }) => (
-            <NavLink key={to} to={to} end={to === '/'} className={linkClass}>
+            <NavLink
+              key={to}
+              to={to}
+              end={to === '/'}
+              className={linkClass}
+              style={TEXT_SHADOW}
+            >
               {label}
             </NavLink>
           ))}
@@ -46,7 +56,8 @@ export default function Header() {
 
         {/* Mobile hamburger */}
         <button
-          className="sm:hidden p-2 rounded-md text-gray-600 hover:text-pink-500 hover:bg-pink-50 transition-colors"
+          className="sm:hidden p-2 rounded-md text-gray-700 hover:text-rose-700 transition-colors"
+          style={TEXT_SHADOW}
           onClick={() => setMenuOpen((o) => !o)}
           aria-label="Toggle menu"
         >
@@ -64,19 +75,20 @@ export default function Header() {
 
       {/* Mobile menu */}
       {menuOpen && (
-        <nav className="sm:hidden border-t border-pink-100 bg-white px-4 py-3 flex flex-col gap-1">
+        <nav className="sm:hidden border-t border-pink-200 px-4 py-3 flex flex-col gap-1" style={STRIPE_BG}>
           {NAV_LINKS.map(({ to, label }) => (
             <NavLink
               key={to}
               to={to}
               end={to === '/'}
               className={({ isActive }) =>
-                `block px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                `block px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${
                   isActive
-                    ? 'bg-pink-50 text-pink-600'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-pink-500'
+                    ? 'bg-white/50 text-rose-700'
+                    : 'text-gray-700 hover:bg-white/40 hover:text-rose-600'
                 }`
               }
+              style={TEXT_SHADOW}
               onClick={() => setMenuOpen(false)}
             >
               {label}
