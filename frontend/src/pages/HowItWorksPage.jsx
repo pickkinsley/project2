@@ -25,19 +25,19 @@ const STEPS = [
 
 export default function HowItWorksPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-violet-700 to-indigo-600 px-4 py-12">
+    <div className="min-h-screen bg-gradient-to-br from-rose-200 via-pink-100 to-rose-50 px-4 py-12">
       <div className="max-w-xl mx-auto space-y-5">
 
         {/* Header */}
-        <div className="text-center text-white py-4">
-          <h1 className="text-3xl font-bold mb-2">How PackSmart Works</h1>
-          <p className="text-white/70 text-sm">From trip details to a ready-to-pack checklist in seconds.</p>
+        <div className="text-center py-4">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">How PackSmart Works</h1>
+          <p className="text-gray-500 text-sm">From trip details to a ready-to-pack checklist in seconds.</p>
         </div>
 
         {/* Steps */}
         {STEPS.map((step) => (
           <div key={step.number} className="bg-white rounded-2xl shadow-sm p-6 flex items-start gap-4">
-            <span className="shrink-0 w-10 h-10 rounded-full bg-violet-600 text-white font-bold text-lg flex items-center justify-center">
+            <span className="shrink-0 w-10 h-10 rounded-full bg-emerald-400 text-white font-bold text-lg flex items-center justify-center">
               {step.number}
             </span>
             <div>
@@ -51,7 +51,7 @@ export default function HowItWorksPage() {
         <div className="text-center pt-2 pb-4">
           <Link
             to="/"
-            className="inline-block bg-white text-violet-700 font-bold px-8 py-3 rounded-xl shadow-lg hover:bg-violet-50 transition-colors text-sm"
+            className="inline-block bg-emerald-400 hover:bg-emerald-500 text-white font-bold px-8 py-3 rounded-xl shadow-lg transition-colors text-sm"
           >
             Get Started →
           </Link>

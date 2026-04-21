@@ -93,7 +93,7 @@ export default function HomePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-violet-700 to-indigo-600 flex items-center justify-center px-4 py-12">
+    <div className="min-h-screen bg-gradient-to-br from-rose-200 via-pink-100 to-rose-50 flex items-center justify-center px-4 py-12">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl p-8">
 
         {/* Header */}
@@ -114,7 +114,7 @@ export default function HomePage() {
           {/* Destination */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Destination <span className="text-red-500">*</span>
+              Destination <span className="text-pink-500">*</span>
             </label>
             <input
               type="text"
@@ -122,7 +122,7 @@ export default function HomePage() {
               value={form.destination}
               onChange={handleChange}
               placeholder="e.g., Paris, France"
-              className={`w-full rounded-lg border px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500 ${errors.destination ? 'border-red-400' : 'border-gray-300'}`}
+              className={`w-full rounded-lg border px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-pink-400 ${errors.destination ? 'border-red-400' : 'border-gray-300'}`}
             />
             {errors.destination && <p className="mt-1 text-xs text-red-600">{errors.destination}</p>}
           </div>
@@ -131,27 +131,27 @@ export default function HomePage() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Departure Date <span className="text-red-500">*</span>
+                Departure Date <span className="text-pink-500">*</span>
               </label>
               <input
                 type="date"
                 name="departure_date"
                 value={form.departure_date}
                 onChange={handleChange}
-                className={`w-full rounded-lg border px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500 ${errors.departure_date ? 'border-red-400' : 'border-gray-300'}`}
+                className={`w-full rounded-lg border px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-pink-400 ${errors.departure_date ? 'border-red-400' : 'border-gray-300'}`}
               />
               {errors.departure_date && <p className="mt-1 text-xs text-red-600">{errors.departure_date}</p>}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Return Date <span className="text-red-500">*</span>
+                Return Date <span className="text-pink-500">*</span>
               </label>
               <input
                 type="date"
                 name="return_date"
                 value={form.return_date}
                 onChange={handleChange}
-                className={`w-full rounded-lg border px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500 ${errors.return_date ? 'border-red-400' : 'border-gray-300'}`}
+                className={`w-full rounded-lg border px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-pink-400 ${errors.return_date ? 'border-red-400' : 'border-gray-300'}`}
               />
               {errors.return_date && <p className="mt-1 text-xs text-red-600">{errors.return_date}</p>}
             </div>
@@ -160,13 +160,13 @@ export default function HomePage() {
           {/* Trip Type */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Trip Type <span className="text-red-500">*</span>
+              Trip Type <span className="text-pink-500">*</span>
             </label>
             <select
               name="trip_type"
               value={form.trip_type}
               onChange={handleChange}
-              className={`w-full rounded-lg border px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white ${errors.trip_type ? 'border-red-400' : 'border-gray-300'}`}
+              className={`w-full rounded-lg border px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-pink-400 bg-white ${errors.trip_type ? 'border-red-400' : 'border-gray-300'}`}
             >
               <option value="">Select trip type…</option>
               {TRIP_TYPES.map((t) => (
@@ -179,13 +179,13 @@ export default function HomePage() {
           {/* Companions */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Traveling With <span className="text-red-500">*</span>
+              Traveling With <span className="text-pink-500">*</span>
             </label>
             <select
               name="companions"
               value={form.companions}
               onChange={handleChange}
-              className={`w-full rounded-lg border px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white ${errors.companions ? 'border-red-400' : 'border-gray-300'}`}
+              className={`w-full rounded-lg border px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-pink-400 bg-white ${errors.companions ? 'border-red-400' : 'border-gray-300'}`}
             >
               <option value="">Select companions…</option>
               {COMPANIONS.map((c) => (
@@ -198,7 +198,7 @@ export default function HomePage() {
           {/* Activities */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Activities <span className="text-red-500">*</span>
+              Activities <span className="text-pink-500">*</span>
             </label>
             <div className="grid grid-cols-2 gap-2">
               {ACTIVITIES.map((a) => {
@@ -206,11 +206,11 @@ export default function HomePage() {
                 return (
                   <label
                     key={a.value}
-                    className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm cursor-pointer select-none transition-colors ${checked ? 'border-violet-500 bg-violet-50 text-violet-800' : 'border-gray-200 text-gray-700 hover:border-gray-300'}`}
+                    className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm cursor-pointer select-none transition-colors ${checked ? 'border-pink-400 bg-pink-50 text-pink-800' : 'border-gray-200 text-gray-700 hover:border-gray-300'}`}
                   >
                     <input
                       type="checkbox"
-                      className="accent-violet-600"
+                      className="accent-pink-500"
                       checked={checked}
                       onChange={() => handleActivityToggle(a.value)}
                     />
@@ -233,7 +233,7 @@ export default function HomePage() {
               onChange={handleChange}
               rows={4}
               placeholder="Any special considerations for your trip? (e.g., medical needs, climate concerns, specific events...)"
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500 resize-y"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-pink-400 resize-y"
             />
           </div>
 
@@ -241,7 +241,7 @@ export default function HomePage() {
           <button
             type="submit"
             disabled={mutation.isPending}
-            className="w-full rounded-lg bg-violet-600 hover:bg-violet-700 disabled:opacity-60 disabled:cursor-not-allowed text-white font-semibold py-3 text-sm transition-colors mt-2"
+            className="w-full rounded-lg bg-pink-500 hover:bg-pink-600 disabled:opacity-60 disabled:cursor-not-allowed text-white font-semibold py-3 text-sm transition-colors mt-2"
           >
             {mutation.isPending ? 'Creating…' : 'Generate Packing List'}
           </button>

@@ -37,11 +37,10 @@ function WeatherCard({ weather }) {
       {weather.daily_forecast?.length > 0 && (
         <div className="flex gap-2 overflow-x-auto pb-1">
           {weather.daily_forecast.map((day) => {
-            // Parse date as local to avoid UTC-offset day shift
             const [y, m, d] = day.date.split('-')
             const label = new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'short' })
             return (
-              <div key={day.date} className="flex flex-col items-center min-w-[58px] bg-gray-50 rounded-xl p-3">
+              <div key={day.date} className="flex flex-col items-center min-w-[58px] bg-pink-50 rounded-xl p-3">
                 <span className="text-xs text-gray-500 mb-1">{label}</span>
                 <span className="text-xl mb-1">{WEATHER_ICONS[day.icon] ?? '🌡'}</span>
                 <span className="text-xs text-gray-500">{day.min_f}°</span>
@@ -64,7 +63,7 @@ function PackingItem({ item, onToggle }) {
         type="checkbox"
         checked={item.is_checked}
         onChange={() => onToggle(item.id, !item.is_checked)}
-        className="mt-0.5 w-4 h-4 accent-violet-600 cursor-pointer shrink-0"
+        className="mt-0.5 w-4 h-4 accent-pink-500 cursor-pointer shrink-0"
       />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
@@ -72,7 +71,7 @@ function PackingItem({ item, onToggle }) {
             {item.name}
           </span>
           {item.is_essential && (
-            <span className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-semibold leading-none">
+            <span className="text-xs bg-pink-100 text-pink-700 px-1.5 py-0.5 rounded font-semibold leading-none">
               Essential
             </span>
           )}
@@ -93,7 +92,7 @@ function CategoryCard({ category, items, onToggle }) {
     <div className="bg-white rounded-2xl shadow-sm p-6">
       <div className="flex items-center justify-between mb-2">
         <h3 className="font-semibold text-gray-800">{category}</h3>
-        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${allDone ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${allDone ? 'bg-green-100 text-green-700' : 'bg-pink-50 text-pink-500'}`}>
           {checkedCount}/{items.length}
         </span>
       </div>
@@ -109,7 +108,6 @@ function CategoryCard({ category, items, onToggle }) {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function groupByCategory(items) {
-  // Items arrive sorted by sort_order — preserve that order within each group.
   const groups = {}
   for (const item of items) {
     if (!groups[item.category]) groups[item.category] = []
@@ -162,10 +160,10 @@ export default function PackingListPage() {
   // ── Loading ──
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-violet-700 to-indigo-600 flex items-center justify-center">
-        <div className="text-white text-center">
+      <div className="min-h-screen bg-gradient-to-br from-rose-200 via-pink-100 to-rose-50 flex items-center justify-center">
+        <div className="text-center">
           <div className="text-4xl mb-4">🎒</div>
-          <p className="text-lg font-medium opacity-90">Loading your packing list…</p>
+          <p className="text-lg font-medium text-gray-700">Loading your packing list…</p>
         </div>
       </div>
     )
@@ -175,12 +173,12 @@ export default function PackingListPage() {
   if (isError) {
     const msg = error?.message ?? 'Trip not found.'
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-violet-700 to-indigo-600 flex items-center justify-center px-4">
+      <div className="min-h-screen bg-gradient-to-br from-rose-200 via-pink-100 to-rose-50 flex items-center justify-center px-4">
         <div className="bg-white rounded-2xl shadow-2xl p-10 text-center max-w-sm w-full">
           <div className="text-4xl mb-4">🔍</div>
           <h1 className="text-xl font-bold text-gray-800 mb-2">Trip Not Found</h1>
           <p className="text-sm text-gray-500 mb-6">{msg}</p>
-          <Link to="/" className="inline-block bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition-colors">
+          <Link to="/" className="inline-block bg-pink-500 hover:bg-pink-600 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition-colors">
             ← Plan a New Trip
           </Link>
         </div>
@@ -195,11 +193,11 @@ export default function PackingListPage() {
   const categories = groupByCategory(trip.items)
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-violet-700 to-indigo-600 px-4 py-10">
+    <div className="min-h-screen bg-gradient-to-br from-rose-200 via-pink-100 to-rose-50 px-4 py-10">
       <div className="max-w-2xl mx-auto space-y-4">
 
         {/* Back link */}
-        <Link to="/" className="inline-flex items-center gap-1 text-white/80 hover:text-white text-sm transition-colors">
+        <Link to="/" className="inline-flex items-center gap-1 text-rose-700 hover:text-rose-900 text-sm transition-colors">
           ← New Trip
         </Link>
 
@@ -211,10 +209,10 @@ export default function PackingListPage() {
             <span className="ml-2 text-gray-400">· {trip.duration_days} day{trip.duration_days !== 1 ? 's' : ''}</span>
           </p>
           <div className="flex flex-wrap gap-2 mt-3">
-            <span className="text-xs bg-violet-100 text-violet-700 px-2.5 py-1 rounded-full font-medium capitalize">
+            <span className="text-xs bg-pink-100 text-pink-700 px-2.5 py-1 rounded-full font-medium capitalize">
               {trip.trip_type.replace('_', ' ')}
             </span>
-            <span className="text-xs bg-violet-100 text-violet-700 px-2.5 py-1 rounded-full font-medium capitalize">
+            <span className="text-xs bg-pink-100 text-pink-700 px-2.5 py-1 rounded-full font-medium capitalize">
               {trip.companions}
             </span>
           </div>
@@ -226,9 +224,9 @@ export default function PackingListPage() {
             <span className="font-medium text-gray-700">Packing progress</span>
             <span className="text-gray-500">{checkedCount} of {totalCount} items</span>
           </div>
-          <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+          <div className="h-2 bg-pink-100 rounded-full overflow-hidden">
             <div
-              className="h-full bg-violet-500 rounded-full transition-all duration-300"
+              className="h-full bg-pink-400 rounded-full transition-all duration-300"
               style={{ width: `${progressPct}%` }}
             />
           </div>
