@@ -1,0 +1,317 @@
+import { useState } from 'react'
+import { useParams, Link, useNavigate } from 'react-router-dom'
+import { useQuery, useMutation } from '@tanstack/react-query'
+import { getTrip, updateTrip } from '../api/trips.js'
+
+const TRIP_TYPES = [
+  { value: 'international', label: 'International' },
+  { value: 'domestic',      label: 'Domestic' },
+  { value: 'beach',         label: 'Beach' },
+  { value: 'cold_weather',  label: 'Cold Weather' },
+  { value: 'business',      label: 'Business' },
+]
+
+const COMPANIONS = [
+  { value: 'solo',   label: 'Solo' },
+  { value: 'couple', label: 'Couple' },
+  { value: 'family', label: 'Family' },
+  { value: 'group',  label: 'Group' },
+]
+
+const ACTIVITIES = [
+  { value: 'sightseeing',      label: 'Sightseeing' },
+  { value: 'beach',            label: 'Beach' },
+  { value: 'hiking',           label: 'Hiking' },
+  { value: 'fine_dining',      label: 'Fine Dining' },
+  { value: 'shopping',         label: 'Shopping' },
+  { value: 'nightlife',        label: 'Nightlife' },
+  { value: 'adventure_sports', label: 'Adventure Sports' },
+  { value: 'skiing',           label: 'Skiing/Snowboarding' },
+  { value: 'water_sports',     label: 'Water Sports' },
+  { value: 'photography',      label: 'Photography' },
+  { value: 'museums',          label: 'Museums & Culture' },
+  { value: 'food_tours',       label: 'Food Tours' },
+  { value: 'spa',              label: 'Spa & Wellness' },
+  { value: 'business',         label: 'Business Meetings' },
+  { value: 'concerts',         label: 'Concerts/Events' },
+  { value: 'theme_parks',      label: 'Theme Parks' },
+  { value: 'camping',          label: 'Camping' },
+  { value: 'road_trip',        label: 'Road Trip' },
+  { value: 'wine_tasting',     label: 'Wine Tasting' },
+  { value: 'festivals',        label: 'Festivals' },
+]
+
+// ─── Form (rendered only after trip data is loaded) ───────────────────────────
+
+function EditTripForm({ trip, tripId }) {
+  const navigate = useNavigate()
+
+  const [form, setForm] = useState({
+    destination:    trip.destination,
+    departure_date: trip.departure_date,
+    return_date:    trip.return_date,
+    trip_type:      trip.trip_type,
+    companions:     trip.companions,
+    activities:     trip.activities ?? [],
+    notes:          trip.notes ?? '',
+  })
+  const [errors, setErrors] = useState({})
+
+  const mutation = useMutation({
+    mutationFn: (formData) => updateTrip(tripId, formData),
+    onSuccess: () => navigate(`/packing-list/${tripId}`),
+  })
+
+  function clearFieldError(field) {
+    if (errors[field]) setErrors((e) => ({ ...e, [field]: undefined }))
+  }
+
+  function handleChange(e) {
+    const { name, value } = e.target
+    setForm((f) => ({ ...f, [name]: value }))
+    clearFieldError(name)
+    mutation.reset()
+  }
+
+  function handleActivityToggle(value) {
+    setForm((f) => {
+      const next = f.activities.includes(value)
+        ? f.activities.filter((a) => a !== value)
+        : [...f.activities, value]
+      return { ...f, activities: next }
+    })
+    clearFieldError('activities')
+    mutation.reset()
+  }
+
+  function validate() {
+    const e = {}
+    if (!form.destination.trim()) e.destination = 'Destination is required.'
+    if (!form.departure_date)     e.departure_date = 'Departure date is required.'
+    if (!form.return_date)        e.return_date = 'Return date is required.'
+    if (form.departure_date && form.return_date && form.return_date <= form.departure_date)
+      e.return_date = 'Return date must be after departure date.'
+    if (!form.trip_type)          e.trip_type = 'Trip type is required.'
+    if (!form.companions)         e.companions = 'Companions is required.'
+    if (form.activities.length === 0) e.activities = 'Select at least one activity.'
+    return e
+  }
+
+  function handleSubmit(e) {
+    e.preventDefault()
+    const errs = validate()
+    if (Object.keys(errs).length > 0) {
+      setErrors(errs)
+      return
+    }
+    mutation.mutate(form)
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-rose-200 via-pink-100 to-rose-50 flex items-center justify-center px-4 py-12">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl p-8">
+
+        {/* Header */}
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">Edit Trip Details</h1>
+          <p className="mt-2 text-gray-500 text-sm">Update your trip information</p>
+        </div>
+
+        {/* API error banner */}
+        {mutation.isError && (
+          <div className="mb-6 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+            {mutation.error?.message ?? 'Something went wrong. Please try again.'}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} noValidate className="space-y-5">
+
+          {/* Destination */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Destination <span className="text-pink-500">*</span>
+            </label>
+            <input
+              type="text"
+              name="destination"
+              value={form.destination}
+              onChange={handleChange}
+              placeholder="e.g., Paris, France"
+              className={`w-full rounded-lg border px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-pink-400 ${errors.destination ? 'border-red-400' : 'border-gray-300'}`}
+            />
+            {errors.destination && <p className="mt-1 text-xs text-red-600">{errors.destination}</p>}
+          </div>
+
+          {/* Dates */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Departure Date <span className="text-pink-500">*</span>
+              </label>
+              <input
+                type="date"
+                name="departure_date"
+                value={form.departure_date}
+                onChange={handleChange}
+                className={`w-full rounded-lg border px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-pink-400 ${errors.departure_date ? 'border-red-400' : 'border-gray-300'}`}
+              />
+              {errors.departure_date && <p className="mt-1 text-xs text-red-600">{errors.departure_date}</p>}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Return Date <span className="text-pink-500">*</span>
+              </label>
+              <input
+                type="date"
+                name="return_date"
+                value={form.return_date}
+                onChange={handleChange}
+                className={`w-full rounded-lg border px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-pink-400 ${errors.return_date ? 'border-red-400' : 'border-gray-300'}`}
+              />
+              {errors.return_date && <p className="mt-1 text-xs text-red-600">{errors.return_date}</p>}
+            </div>
+          </div>
+
+          {/* Trip Type */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Trip Type <span className="text-pink-500">*</span>
+            </label>
+            <select
+              name="trip_type"
+              value={form.trip_type}
+              onChange={handleChange}
+              className={`w-full rounded-lg border px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-pink-400 bg-white ${errors.trip_type ? 'border-red-400' : 'border-gray-300'}`}
+            >
+              <option value="">Select trip type…</option>
+              {TRIP_TYPES.map((t) => (
+                <option key={t.value} value={t.value}>{t.label}</option>
+              ))}
+            </select>
+            {errors.trip_type && <p className="mt-1 text-xs text-red-600">{errors.trip_type}</p>}
+          </div>
+
+          {/* Companions */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Traveling With <span className="text-pink-500">*</span>
+            </label>
+            <select
+              name="companions"
+              value={form.companions}
+              onChange={handleChange}
+              className={`w-full rounded-lg border px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-pink-400 bg-white ${errors.companions ? 'border-red-400' : 'border-gray-300'}`}
+            >
+              <option value="">Select companions…</option>
+              {COMPANIONS.map((c) => (
+                <option key={c.value} value={c.value}>{c.label}</option>
+              ))}
+            </select>
+            {errors.companions && <p className="mt-1 text-xs text-red-600">{errors.companions}</p>}
+          </div>
+
+          {/* Activities */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Activities <span className="text-pink-500">*</span>
+            </label>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {ACTIVITIES.map((a) => {
+                const checked = form.activities.includes(a.value)
+                return (
+                  <label
+                    key={a.value}
+                    className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm cursor-pointer select-none transition-colors ${checked ? 'border-pink-400 bg-pink-50 text-pink-800' : 'border-gray-200 text-gray-700 hover:border-gray-300'}`}
+                  >
+                    <input
+                      type="checkbox"
+                      className="accent-pink-500"
+                      checked={checked}
+                      onChange={() => handleActivityToggle(a.value)}
+                    />
+                    {a.label}
+                  </label>
+                )
+              })}
+            </div>
+            {errors.activities && <p className="mt-1 text-xs text-red-600">{errors.activities}</p>}
+          </div>
+
+          {/* Additional Notes */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Additional Notes <span className="text-gray-400 font-normal">(optional)</span>
+            </label>
+            <textarea
+              name="notes"
+              value={form.notes}
+              onChange={handleChange}
+              rows={4}
+              placeholder="Any special considerations for your trip? (e.g., medical needs, climate concerns, specific events...)"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-pink-400 resize-y"
+            />
+          </div>
+
+          {/* Actions */}
+          <div className="flex gap-3 mt-2">
+            <button
+              type="submit"
+              disabled={mutation.isPending}
+              className="flex-1 rounded-lg bg-pink-500 hover:bg-pink-600 disabled:opacity-60 disabled:cursor-not-allowed text-white font-semibold py-3 text-sm transition-colors"
+            >
+              {mutation.isPending ? 'Saving…' : 'Save Changes'}
+            </button>
+            <Link
+              to={`/packing-list/${tripId}`}
+              className="flex-1 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 font-semibold py-3 text-sm transition-colors text-center"
+            >
+              Cancel
+            </Link>
+          </div>
+
+        </form>
+      </div>
+    </div>
+  )
+}
+
+// ─── Page (handles fetch, loading, error) ────────────────────────────────────
+
+export default function EditTripPage() {
+  const { tripId } = useParams()
+
+  const { data: trip, isLoading, isError, error } = useQuery({
+    queryKey: ['trip', tripId],
+    queryFn: () => getTrip(tripId),
+    retry: false,
+  })
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-rose-200 via-pink-100 to-rose-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-4xl mb-4">🎒</div>
+          <p className="text-lg font-medium text-gray-700">Loading trip details…</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (isError) {
+    const msg = error?.message ?? 'Trip not found.'
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-rose-200 via-pink-100 to-rose-50 flex items-center justify-center px-4">
+        <div className="bg-white rounded-2xl shadow-2xl p-10 text-center max-w-sm w-full">
+          <div className="text-4xl mb-4">🔍</div>
+          <h1 className="text-xl font-bold text-gray-800 mb-2">Trip Not Found</h1>
+          <p className="text-sm text-gray-500 mb-6">{msg}</p>
+          <Link to="/" className="inline-block bg-pink-500 hover:bg-pink-600 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition-colors">
+            ← Plan a New Trip
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
+  return <EditTripForm trip={trip} tripId={tripId} />
+}

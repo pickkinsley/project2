@@ -10,6 +10,25 @@ import (
 	"database/sql"
 )
 
+const createPackingItem = `-- name: CreatePackingItem :execlastid
+INSERT INTO packing_items (trip_id, name, category, is_essential, reason, is_checked, sort_order)
+VALUES (?, ?, ?, false, NULL, false, 9999)
+`
+
+type CreatePackingItemParams struct {
+	TripID   string `json:"trip_id"`
+	Name     string `json:"name"`
+	Category string `json:"category"`
+}
+
+func (q *Queries) CreatePackingItem(ctx context.Context, arg CreatePackingItemParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, createPackingItem, arg.TripID, arg.Name, arg.Category)
+	if err != nil {
+		return 0, err
+	}
+	return result.LastInsertId()
+}
+
 const getItemsByTripID = `-- name: GetItemsByTripID :many
 SELECT id, trip_id, name, category, is_essential, reason, is_checked, sort_order, created_at
 FROM packing_items
@@ -48,6 +67,34 @@ func (q *Queries) GetItemsByTripID(ctx context.Context, tripID string) ([]Packin
 		return nil, err
 	}
 	return items, nil
+}
+
+const getPackingItemByID = `-- name: GetPackingItemByID :one
+SELECT id, trip_id, name, category, is_essential, reason, is_checked, sort_order, created_at
+FROM packing_items
+WHERE id = ? AND trip_id = ?
+`
+
+type GetPackingItemByIDParams struct {
+	ID     int32  `json:"id"`
+	TripID string `json:"trip_id"`
+}
+
+func (q *Queries) GetPackingItemByID(ctx context.Context, arg GetPackingItemByIDParams) (PackingItem, error) {
+	row := q.db.QueryRowContext(ctx, getPackingItemByID, arg.ID, arg.TripID)
+	var i PackingItem
+	err := row.Scan(
+		&i.ID,
+		&i.TripID,
+		&i.Name,
+		&i.Category,
+		&i.IsEssential,
+		&i.Reason,
+		&i.IsChecked,
+		&i.SortOrder,
+		&i.CreatedAt,
+	)
+	return i, err
 }
 
 const insertPackingItem = `-- name: InsertPackingItem :exec

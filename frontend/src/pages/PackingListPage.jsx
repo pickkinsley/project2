@@ -1,6 +1,7 @@
-import { useParams, Link } from 'react-router-dom'
+import { useState } from 'react'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getTrip, updateItemChecked } from '../api/trips.js'
+import { getTrip, updateItemChecked, deleteTrip, createPackingItem } from '../api/trips.js'
 
 // ─── Weather ────────────────────────────────────────────────────────────────
 
@@ -105,6 +106,145 @@ function CategoryCard({ category, items, onToggle }) {
   )
 }
 
+// ─── Add Item Form ────────────────────────────────────────────────────────────
+
+const CATEGORIES = [
+  'Essential Items',
+  'Clothing',
+  'Toiletries',
+  'Electronics',
+  'Documents',
+  'Activity Specific',
+  'Beach Gear',
+  'Cold Weather Gear',
+  'Other',
+]
+
+function AddItemForm({ tripId, onSuccess, onCancel }) {
+  const queryClient = useQueryClient()
+  const [name, setName] = useState('')
+  const [category, setCategory] = useState('')
+  const [errors, setErrors] = useState({})
+
+  const addMutation = useMutation({
+    mutationFn: (itemData) => createPackingItem(tripId, itemData),
+    onMutate: async (itemData) => {
+      await queryClient.cancelQueries({ queryKey: ['trip', tripId] })
+      const previous = queryClient.getQueryData(['trip', tripId])
+      // Optimistically add with a temporary negative ID to avoid collisions
+      const tempItem = {
+        id: -Date.now(),
+        name: itemData.name,
+        category: itemData.category,
+        is_essential: false,
+        reason: '',
+        is_checked: false,
+        sort_order: 9999,
+      }
+      queryClient.setQueryData(['trip', tripId], (old) => ({
+        ...old,
+        items: [...old.items, tempItem],
+      }))
+      return { previous }
+    },
+    onError: (_err, _vars, context) => {
+      queryClient.setQueryData(['trip', tripId], context.previous)
+    },
+    onSuccess: (serverItem) => {
+      // Replace the temp item with the real one from the server
+      queryClient.setQueryData(['trip', tripId], (old) => ({
+        ...old,
+        items: old.items.map((item) =>
+          item.id < 0 ? { ...serverItem } : item
+        ),
+      }))
+      onSuccess()
+    },
+  })
+
+  function validate() {
+    const e = {}
+    const trimmed = name.trim()
+    if (!trimmed) e.name = 'Item name is required.'
+    else if (trimmed.length > 100) e.name = 'Item name must be 100 characters or fewer.'
+    if (!category) e.category = 'Category is required.'
+    return e
+  }
+
+  function handleSubmit(e) {
+    e.preventDefault()
+    const errs = validate()
+    if (Object.keys(errs).length > 0) {
+      setErrors(errs)
+      return
+    }
+    addMutation.mutate({ name: name.trim(), category })
+  }
+
+  return (
+    <div className="bg-white rounded-2xl shadow-sm p-6">
+      <h3 className="font-semibold text-gray-800 mb-4">Add Custom Item</h3>
+
+      {addMutation.isError && (
+        <div className="mb-4 rounded-lg bg-red-50 border border-red-200 px-4 py-2.5 text-sm text-red-700">
+          {addMutation.error?.message ?? 'Failed to add item. Please try again.'}
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} noValidate className="space-y-3">
+        <div>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => {
+              setName(e.target.value)
+              if (errors.name) setErrors((prev) => ({ ...prev, name: undefined }))
+            }}
+            placeholder="e.g., Beach towel, Sunscreen..."
+            maxLength={100}
+            className={`w-full rounded-lg border px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-pink-400 ${errors.name ? 'border-red-400' : 'border-gray-300'}`}
+          />
+          {errors.name && <p className="mt-1 text-xs text-red-600">{errors.name}</p>}
+        </div>
+
+        <div>
+          <select
+            value={category}
+            onChange={(e) => {
+              setCategory(e.target.value)
+              if (errors.category) setErrors((prev) => ({ ...prev, category: undefined }))
+            }}
+            className={`w-full rounded-lg border px-3 py-2 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-pink-400 ${errors.category ? 'border-red-400' : 'border-gray-300'}`}
+          >
+            <option value="">Select category…</option>
+            {CATEGORIES.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+          {errors.category && <p className="mt-1 text-xs text-red-600">{errors.category}</p>}
+        </div>
+
+        <div className="flex gap-2 pt-1">
+          <button
+            type="submit"
+            disabled={addMutation.isPending}
+            className="flex-1 rounded-lg bg-pink-400 hover:bg-pink-500 disabled:opacity-60 disabled:cursor-not-allowed text-white font-semibold py-2 text-sm transition-colors"
+          >
+            {addMutation.isPending ? 'Adding…' : 'Add Item'}
+          </button>
+          <button
+            type="button"
+            onClick={onCancel}
+            className="flex-1 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 font-semibold py-2 text-sm transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+      </form>
+    </div>
+  )
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function groupByCategory(items) {
@@ -127,7 +267,9 @@ function formatDate(dateStr) {
 
 export default function PackingListPage() {
   const { tripId } = useParams()
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const [showAddForm, setShowAddForm] = useState(false)
 
   const { data: trip, isLoading, isError, error } = useQuery({
     queryKey: ['trip', tripId],
@@ -153,8 +295,20 @@ export default function PackingListPage() {
     },
   })
 
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteTrip(tripId),
+    onSuccess: () => navigate('/'),
+    onError: (err) => alert(err?.message ?? 'Failed to delete trip. Please try again.'),
+  })
+
   function handleToggle(itemId, isChecked) {
     toggleMutation.mutate({ itemId, isChecked })
+  }
+
+  function handleDelete() {
+    if (window.confirm('Are you sure you want to delete this trip? This cannot be undone.')) {
+      deleteMutation.mutate()
+    }
   }
 
   // ── Loading ──
@@ -216,6 +370,22 @@ export default function PackingListPage() {
               {trip.companions}
             </span>
           </div>
+
+          <div className="flex gap-2 mt-4">
+            <Link
+              to={`/edit-trip/${tripId}`}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-pink-50 border border-pink-300 text-pink-700 text-sm font-semibold hover:bg-pink-100 transition-colors"
+            >
+              ✏️ Edit Trip
+            </Link>
+            <button
+              onClick={handleDelete}
+              disabled={deleteMutation.isPending}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-rose-300 text-rose-600 text-sm font-semibold hover:bg-rose-50 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+            >
+              {deleteMutation.isPending ? 'Deleting…' : '🗑️ Delete'}
+            </button>
+          </div>
         </div>
 
         {/* Progress */}
@@ -237,6 +407,22 @@ export default function PackingListPage() {
 
         {/* Weather */}
         <WeatherCard weather={trip.weather} />
+
+        {/* Add Item button / form */}
+        {showAddForm ? (
+          <AddItemForm
+            tripId={tripId}
+            onSuccess={() => setShowAddForm(false)}
+            onCancel={() => setShowAddForm(false)}
+          />
+        ) : (
+          <button
+            onClick={() => setShowAddForm(true)}
+            className="w-full rounded-2xl bg-pink-400 hover:bg-pink-500 text-white font-semibold py-3 text-sm transition-colors"
+          >
+            ➕ Add Custom Item
+          </button>
+        )}
 
         {/* Packing list by category */}
         {Object.entries(categories).map(([category, items]) => (

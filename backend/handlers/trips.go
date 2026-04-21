@@ -422,6 +422,74 @@ func (h *Handler) UpdateTrip(c *gin.Context) {
 	})
 }
 
+// CreatePackingItem handles POST /api/trips/:uuid/items.
+func (h *Handler) CreatePackingItem(c *gin.Context) {
+	tripUUID := c.Param("uuid")
+	log.Printf("[INFO] POST /api/trips/%s/items - Creating custom packing item", tripUUID)
+	ctx := context.Background()
+
+	// Verify trip exists.
+	if _, err := h.q.GetTripByID(ctx, tripUUID); err == sql.ErrNoRows {
+		log.Printf("[INFO] POST /api/trips/%s/items - Trip not found, returning 404", tripUUID)
+		c.JSON(http.StatusNotFound, gin.H{"error": "trip_not_found", "message": "No trip found with that ID."})
+		return
+	} else if err != nil {
+		log.Printf("[ERROR] POST /api/trips/%s/items - GetTripByID failed: %v", tripUUID, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Failed to verify trip."})
+		return
+	}
+
+	var req models.CreatePackingItemRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Printf("[ERROR] POST /api/trips/%s/items - Invalid request body: %v", tripUUID, err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request", "message": "Request body must be JSON with name and category fields."})
+		return
+	}
+
+	if len(req.Name) == 0 || len(req.Name) > 100 {
+		log.Printf("[ERROR] POST /api/trips/%s/items - name missing or too long", tripUUID)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request", "message": "name is required and must be 1–100 characters."})
+		return
+	}
+	if req.Category == "" {
+		log.Printf("[ERROR] POST /api/trips/%s/items - category missing", tripUUID)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request", "message": "category is required."})
+		return
+	}
+
+	newID, err := h.q.CreatePackingItem(ctx, dbpkg.CreatePackingItemParams{
+		TripID:   tripUUID,
+		Name:     req.Name,
+		Category: req.Category,
+	})
+	if err != nil {
+		log.Printf("[ERROR] POST /api/trips/%s/items - CreatePackingItem failed: %v", tripUUID, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Failed to create packing item."})
+		return
+	}
+
+	row, err := h.q.GetPackingItemByID(ctx, dbpkg.GetPackingItemByIDParams{
+		ID:     int32(newID),
+		TripID: tripUUID,
+	})
+	if err != nil {
+		log.Printf("[ERROR] POST /api/trips/%s/items - GetPackingItemByID failed: %v", tripUUID, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Item created but failed to retrieve it."})
+		return
+	}
+
+	log.Printf("[INFO] POST /api/trips/%s/items - Created item %d %q, returning 201", tripUUID, row.ID, row.Name)
+	c.JSON(http.StatusCreated, models.PackingItem{
+		ID:          int(row.ID),
+		Name:        row.Name,
+		Category:    row.Category,
+		IsEssential: row.IsEssential,
+		Reason:      row.Reason.String,
+		IsChecked:   row.IsChecked,
+		SortOrder:   int(row.SortOrder),
+	})
+}
+
 // DeleteTrip handles DELETE /api/trips/:uuid.
 // ON DELETE CASCADE in the schema removes packing_items and weather_snapshots automatically.
 func (h *Handler) DeleteTrip(c *gin.Context) {

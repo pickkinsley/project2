@@ -46,6 +46,15 @@ export async function deleteTrip(tripId) {
   return parseResponse(res)
 }
 
+export async function createPackingItem(tripId, itemData) {
+  const res = await fetch(`${BASE}/trips/${tripId}/items`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(itemData),
+  })
+  return parseResponse(res)
+}
+
 export async function updateItemChecked(tripId, itemId, isChecked) {
   const res = await fetch(`${BASE}/trips/${tripId}/items/${itemId}`, {
     method: 'PATCH',

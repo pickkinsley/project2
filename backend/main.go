@@ -40,6 +40,7 @@ func main() {
 		api.GET("/trips/:uuid", h.GetTrip)
 		api.PUT("/trips/:uuid", h.UpdateTrip)
 		api.DELETE("/trips/:uuid", h.DeleteTrip)
+		api.POST("/trips/:uuid/items", h.CreatePackingItem)
 		api.PATCH("/trips/:uuid/items/:itemId", h.UpdateItemCheckbox)
 	}
 

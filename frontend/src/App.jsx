@@ -5,6 +5,7 @@ import PackingListPage from './pages/PackingListPage.jsx'
 import AboutPage from './pages/AboutPage.jsx'
 import MyTripsPage from './pages/MyTripsPage.jsx'
 import HowItWorksPage from './pages/HowItWorksPage.jsx'
+import EditTripPage from './pages/EditTripPage.jsx'
 import NotFoundPage from './pages/NotFoundPage.jsx'
 
 function App() {
@@ -17,6 +18,7 @@ function App() {
         <Route path="/about" element={<AboutPage />} />
         <Route path="/my-trips" element={<MyTripsPage />} />
         <Route path="/how-it-works" element={<HowItWorksPage />} />
+        <Route path="/edit-trip/:tripId" element={<EditTripPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </>

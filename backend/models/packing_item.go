@@ -16,6 +16,12 @@ type PackingItem struct {
 	CreatedAt   time.Time `json:"-"`           // Internal — omitted from API response
 }
 
+// CreatePackingItemRequest is the JSON body received by POST /api/trips/{uuid}/items.
+type CreatePackingItemRequest struct {
+	Name     string `json:"name"`
+	Category string `json:"category"`
+}
+
 // UpdateItemRequest is the JSON body received by PATCH /api/trips/{uuid}/items/{itemId}.
 type UpdateItemRequest struct {
 	IsChecked bool `json:"is_checked"`

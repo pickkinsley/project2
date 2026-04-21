@@ -9,13 +9,17 @@ import (
 )
 
 type Querier interface {
+	CreatePackingItem(ctx context.Context, arg CreatePackingItemParams) (int64, error)
+	DeleteTrip(ctx context.Context, id string) error
 	GetItemsByTripID(ctx context.Context, tripID string) ([]PackingItem, error)
+	GetPackingItemByID(ctx context.Context, arg GetPackingItemByIDParams) (PackingItem, error)
 	GetTripByID(ctx context.Context, id string) (Trip, error)
 	GetWeatherByTripID(ctx context.Context, tripID string) (WeatherSnapshot, error)
 	InsertPackingItem(ctx context.Context, arg InsertPackingItemParams) error
 	InsertTrip(ctx context.Context, arg InsertTripParams) error
 	InsertWeatherSnapshot(ctx context.Context, arg InsertWeatherSnapshotParams) error
 	UpdateItemChecked(ctx context.Context, arg UpdateItemCheckedParams) error
+	UpdateTrip(ctx context.Context, arg UpdateTripParams) error
 }
 
 var _ Querier = (*Queries)(nil)
