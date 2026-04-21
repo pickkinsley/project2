@@ -32,7 +32,7 @@ export default function Header() {
         {/* Brand */}
         <Link
           to="/"
-          className="flex items-center gap-2 font-bold text-white hover:text-white/80 transition-colors"
+          className="flex items-center gap-2 font-bold text-black hover:text-black/70 transition-colors"
           style={TEXT_SHADOW}
         >
           <span className="text-xl">🎒</span>
