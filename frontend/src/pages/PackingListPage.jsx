@@ -64,6 +64,7 @@ function PackingItem({ item, onToggle }) {
         type="checkbox"
         checked={item.is_checked}
         onChange={() => onToggle(item.id, !item.is_checked)}
+        aria-label={item.name}
         className="mt-0.5 w-4 h-4 accent-pink-500 cursor-pointer shrink-0"
       />
       <div className="flex-1 min-w-0">
@@ -131,9 +132,9 @@ function AddItemForm({ tripId, onSuccess, onCancel }) {
     onMutate: async (itemData) => {
       await queryClient.cancelQueries({ queryKey: ['trip', tripId] })
       const previous = queryClient.getQueryData(['trip', tripId])
-      // Optimistically add with a temporary negative ID to avoid collisions
+      const tempId = -Date.now()
       const tempItem = {
-        id: -Date.now(),
+        id: tempId,
         name: itemData.name,
         category: itemData.category,
         is_essential: false,
@@ -145,17 +146,16 @@ function AddItemForm({ tripId, onSuccess, onCancel }) {
         ...old,
         items: [...old.items, tempItem],
       }))
-      return { previous }
+      return { previous, tempId }
     },
     onError: (_err, _vars, context) => {
       queryClient.setQueryData(['trip', tripId], context.previous)
     },
-    onSuccess: (serverItem) => {
-      // Replace the temp item with the real one from the server
+    onSuccess: (serverItem, _vars, context) => {
       queryClient.setQueryData(['trip', tripId], (old) => ({
         ...old,
         items: old.items.map((item) =>
-          item.id < 0 ? { ...serverItem } : item
+          item.id === context.tempId ? { ...serverItem } : item
         ),
       }))
       onSuccess()
@@ -270,6 +270,7 @@ export default function PackingListPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [showAddForm, setShowAddForm] = useState(false)
+  const [toggleError, setToggleError] = useState(null)
 
   const { data: trip, isLoading, isError, error } = useQuery({
     queryKey: ['trip', tripId],
@@ -292,6 +293,8 @@ export default function PackingListPage() {
     },
     onError: (_err, _vars, context) => {
       queryClient.setQueryData(['trip', tripId], context.previous)
+      setToggleError('Failed to save — please try again.')
+      setTimeout(() => setToggleError(null), 3000)
     },
   })
 
@@ -364,7 +367,7 @@ export default function PackingListPage() {
           </p>
           <div className="flex flex-wrap gap-2 mt-3">
             <span className="text-xs bg-pink-100 text-pink-700 px-2.5 py-1 rounded-full font-medium capitalize">
-              {trip.trip_type.replace('_', ' ')}
+              {trip.trip_type.replace(/_/g, ' ')}
             </span>
             <span className="text-xs bg-pink-100 text-pink-700 px-2.5 py-1 rounded-full font-medium capitalize">
               {trip.companions}
@@ -394,7 +397,14 @@ export default function PackingListPage() {
             <span className="font-medium text-gray-700">Packing progress</span>
             <span className="text-gray-500">{checkedCount} of {totalCount} items</span>
           </div>
-          <div className="h-2 bg-pink-100 rounded-full overflow-hidden">
+          <div
+            role="progressbar"
+            aria-valuenow={progressPct}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label="Packing progress"
+            className="h-2 bg-pink-100 rounded-full overflow-hidden"
+          >
             <div
               className="h-full bg-pink-400 rounded-full transition-all duration-300"
               style={{ width: `${progressPct}%` }}
@@ -402,6 +412,9 @@ export default function PackingListPage() {
           </div>
           {progressPct === 100 && (
             <p className="text-xs text-green-600 font-medium mt-2">✓ All packed — you're ready to go!</p>
+          )}
+          {toggleError && (
+            <p className="text-xs text-red-600 font-medium mt-2">⚠️ {toggleError}</p>
           )}
         </div>
 
@@ -425,14 +438,20 @@ export default function PackingListPage() {
         )}
 
         {/* Packing list by category */}
-        {Object.entries(categories).map(([category, items]) => (
-          <CategoryCard
-            key={category}
-            category={category}
-            items={items}
-            onToggle={handleToggle}
-          />
-        ))}
+        {totalCount === 0 ? (
+          <div className="bg-white rounded-2xl shadow-sm px-6 py-8 text-center text-sm text-gray-500">
+            Your packing list is empty. Add your first item below!
+          </div>
+        ) : (
+          Object.entries(categories).map(([category, items]) => (
+            <CategoryCard
+              key={category}
+              category={category}
+              items={items}
+              onToggle={handleToggle}
+            />
+          ))
+        )}
 
       </div>
     </div>

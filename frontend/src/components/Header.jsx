@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, NavLink } from 'react-router-dom'
+import { Link, NavLink, useMatch } from 'react-router-dom'
 
 const NAV_LINKS = [
   { to: '/about',        label: 'About' },
@@ -18,10 +18,17 @@ const TEXT_SHADOW = { textShadow: '0 1px 3px rgba(255,255,255,0.8)' }
 export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false)
 
-  const linkClass = ({ isActive }) =>
-    `text-sm font-bold transition-colors ${
-      isActive ? 'text-black' : 'text-black/70 hover:text-black'
+  // Treat packing list and edit trip pages as part of the Create Trip flow
+  const onPackingList = useMatch('/packing-list/:id')
+  const onEditTrip    = useMatch('/edit-trip/:id')
+  const createTripActive = !!(onPackingList || onEditTrip)
+
+  const linkClass = ({ isActive }, to) => {
+    const active = isActive || (to === '/' && createTripActive)
+    return `text-sm font-bold transition-colors ${
+      active ? 'text-black' : 'text-black/70 hover:text-black'
     }`
+  }
 
   return (
     <header className="sticky top-0 z-50 shadow-sm" style={STRIPE_BG}>
@@ -46,7 +53,7 @@ export default function Header() {
               key={to}
               to={to}
               end={to === '/'}
-              className={linkClass}
+              className={(state) => linkClass(state, to)}
               style={TEXT_SHADOW}
             >
               {label}
@@ -81,13 +88,14 @@ export default function Header() {
               key={to}
               to={to}
               end={to === '/'}
-              className={({ isActive }) =>
-                `block px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                  isActive
+              className={({ isActive }) => {
+                const active = isActive || (to === '/' && createTripActive)
+                return `block px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                  active
                     ? 'bg-white/30 text-black'
                     : 'text-black/70 hover:bg-white/20 hover:text-black'
                 }`
-              }
+              }}
               style={TEXT_SHADOW}
               onClick={() => setMenuOpen(false)}
             >

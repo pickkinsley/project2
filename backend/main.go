@@ -37,6 +37,7 @@ func main() {
 	{
 		api.GET("/health", handlers.Health)
 		api.POST("/trips", h.CreateTrip)
+		api.GET("/trips", h.ListTrips)
 		api.GET("/trips/:uuid", h.GetTrip)
 		api.PUT("/trips/:uuid", h.UpdateTrip)
 		api.DELETE("/trips/:uuid", h.DeleteTrip)

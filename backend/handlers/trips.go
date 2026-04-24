@@ -187,6 +187,36 @@ func (h *Handler) CreateTrip(c *gin.Context) {
 	})
 }
 
+// ListTrips handles GET /api/trips.
+func (h *Handler) ListTrips(c *gin.Context) {
+	log.Printf("[INFO] GET /api/trips - Listing all trips")
+	ctx := context.Background()
+
+	rows, err := h.q.ListAllTrips(ctx)
+	if err != nil {
+		log.Printf("[ERROR] GET /api/trips - ListAllTrips failed: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Failed to retrieve trips."})
+		return
+	}
+
+	summaries := make([]models.TripSummary, len(rows))
+	for i, r := range rows {
+		summaries[i] = models.TripSummary{
+			ID:            r.ID,
+			Destination:   r.Destination,
+			DepartureDate: r.DepartureDate.Format("2006-01-02"),
+			ReturnDate:    r.ReturnDate.Format("2006-01-02"),
+			TripType:      r.TripType,
+			Companions:    r.Companions,
+			DurationDays:  int(r.ReturnDate.Sub(r.DepartureDate).Hours()/24) + 1,
+			CreatedAt:     r.CreatedAt,
+		}
+	}
+
+	log.Printf("[INFO] GET /api/trips - Returning %d trips", len(summaries))
+	c.JSON(http.StatusOK, summaries)
+}
+
 // GetTrip handles GET /api/trips/:uuid.
 func (h *Handler) GetTrip(c *gin.Context) {
 	tripUUID := c.Param("uuid")

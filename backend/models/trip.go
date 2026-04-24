@@ -27,6 +27,19 @@ type CreateTripRequest struct {
 	Activities    []string `json:"activities"`
 }
 
+// TripSummary is the JSON returned by GET /api/trips (list endpoint).
+// Omits items and weather — overview only.
+type TripSummary struct {
+	ID            string    `json:"id"`
+	Destination   string    `json:"destination"`
+	DepartureDate string    `json:"departure_date"`
+	ReturnDate    string    `json:"return_date"`
+	TripType      string    `json:"trip_type"`
+	Companions    string    `json:"companions"`
+	DurationDays  int       `json:"duration_days"`
+	CreatedAt     time.Time `json:"created_at"`
+}
+
 // TripResponse is the JSON returned by POST /api/trips and GET /api/trips/{uuid}.
 // Dates are formatted as YYYY-MM-DD strings for readability.
 // Weather is a pointer so it serializes as null when unavailable.

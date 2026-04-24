@@ -16,3 +16,8 @@ WHERE id = ?;
 
 -- name: DeleteTrip :exec
 DELETE FROM trips WHERE id = ?;
+
+-- name: ListAllTrips :many
+SELECT id, destination, departure_date, return_date, trip_type, companions, created_at
+FROM trips
+ORDER BY created_at DESC;

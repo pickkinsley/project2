@@ -18,6 +18,7 @@ type Querier interface {
 	InsertPackingItem(ctx context.Context, arg InsertPackingItemParams) error
 	InsertTrip(ctx context.Context, arg InsertTripParams) error
 	InsertWeatherSnapshot(ctx context.Context, arg InsertWeatherSnapshotParams) error
+	ListAllTrips(ctx context.Context) ([]ListAllTripsRow, error)
 	UpdateItemChecked(ctx context.Context, arg UpdateItemCheckedParams) error
 	UpdateTrip(ctx context.Context, arg UpdateTripParams) error
 }

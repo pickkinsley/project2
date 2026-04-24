@@ -16,6 +16,11 @@ async function parseResponse(res) {
   }
 }
 
+export async function listTrips() {
+  const res = await fetch(`${BASE}/trips`)
+  return parseResponse(res)
+}
+
 export async function createTrip(formData) {
   const res = await fetch(`${BASE}/trips`, {
     method: 'POST',

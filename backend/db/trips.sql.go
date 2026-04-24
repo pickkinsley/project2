@@ -76,6 +76,53 @@ func (q *Queries) InsertTrip(ctx context.Context, arg InsertTripParams) error {
 	return err
 }
 
+const listAllTrips = `-- name: ListAllTrips :many
+SELECT id, destination, departure_date, return_date, trip_type, companions, created_at
+FROM trips
+ORDER BY created_at DESC
+`
+
+type ListAllTripsRow struct {
+	ID            string    `json:"id"`
+	Destination   string    `json:"destination"`
+	DepartureDate time.Time `json:"departure_date"`
+	ReturnDate    time.Time `json:"return_date"`
+	TripType      string    `json:"trip_type"`
+	Companions    string    `json:"companions"`
+	CreatedAt     time.Time `json:"created_at"`
+}
+
+func (q *Queries) ListAllTrips(ctx context.Context) ([]ListAllTripsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listAllTrips)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListAllTripsRow
+	for rows.Next() {
+		var i ListAllTripsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Destination,
+			&i.DepartureDate,
+			&i.ReturnDate,
+			&i.TripType,
+			&i.Companions,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateTrip = `-- name: UpdateTrip :exec
 UPDATE trips
 SET destination = ?, dest_lat = ?, dest_lon = ?,
