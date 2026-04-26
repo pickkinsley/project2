@@ -39,10 +39,13 @@ function WeatherCard({ weather }) {
         <div className="flex gap-2 overflow-x-auto pb-1">
           {weather.daily_forecast.map((day) => {
             const [y, m, d] = day.date.split('-')
-            const label = new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'short' })
+            const date = new Date(y, m - 1, d)
+            const weekday = date.toLocaleDateString('en-US', { weekday: 'short' })
+            const monthDay = `${date.getMonth() + 1}/${date.getDate()}`
             return (
               <div key={day.date} className="flex flex-col items-center min-w-[58px] bg-pink-50 rounded-xl p-3">
-                <span className="text-xs text-gray-500 mb-1">{label}</span>
+                <span className="text-xs font-medium text-gray-600 mb-0.5">{weekday}</span>
+                <span className="text-xs text-gray-400 mb-1">{monthDay}</span>
                 <span className="text-xl mb-1">{WEATHER_ICONS[day.icon] ?? '🌡'}</span>
                 <span className="text-xs text-gray-500">{day.min_f}°</span>
                 <span className="text-xs font-semibold text-gray-800">{day.max_f}°</span>

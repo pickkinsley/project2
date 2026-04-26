@@ -83,7 +83,7 @@ func (h *Handler) CreateTrip(c *gin.Context) {
 		return
 	}
 
-	weather := mockWeather()
+	weather := mockWeather(departure, returnDate)
 	items := mockItems(req.TripType)
 
 	forecastJSON, err := json.Marshal(weather.DailyForecast)
@@ -565,20 +565,50 @@ func dbItemsToResponse(rows []dbpkg.PackingItem) []models.PackingItem {
 	return out
 }
 
-// mockWeather returns a fixed weather snapshot until Open-Meteo integration is added.
+// mockWeather generates a per-day forecast for the actual trip duration.
 // TODO (Lesson 2 — weather): Replace with real Open-Meteo forecast data.
-func mockWeather() *models.WeatherResponse {
+func mockWeather(departure, returnDate time.Time) *models.WeatherResponse {
+	icons := []string{"sunny", "partly_cloudy", "rainy", "sunny", "partly_cloudy", "cloudy"}
+	// Base temps that shift slightly each day for variety
+	baseMins := []int{52, 50, 48, 54, 55, 51, 53}
+	baseMaxs := []int{68, 65, 60, 70, 72, 64, 67}
+
+	var forecast []models.DailyForecast
+	rainDays := 0
+	overallMin := 999
+	overallMax := 0
+
+	for d := departure; !d.After(returnDate); d = d.AddDate(0, 0, 1) {
+		i := len(forecast)
+		icon := icons[i%len(icons)]
+		minF := baseMins[i%len(baseMins)]
+		maxF := baseMaxs[i%len(baseMaxs)]
+
+		if icon == "rainy" || icon == "stormy" {
+			rainDays++
+		}
+		if minF < overallMin {
+			overallMin = minF
+		}
+		if maxF > overallMax {
+			overallMax = maxF
+		}
+
+		forecast = append(forecast, models.DailyForecast{
+			Date: d.Format("2006-01-02"),
+			Icon: icon,
+			MinF: minF,
+			MaxF: maxF,
+		})
+	}
+
 	return &models.WeatherResponse{
-		TempMinF:   52,
-		TempMaxF:   68,
-		RainDays:   2,
-		SnowDays:   0,
-		IsForecast: true,
-		DailyForecast: []models.DailyForecast{
-			{Date: "2026-05-01", Icon: "sunny", MinF: 55, MaxF: 68},
-			{Date: "2026-05-02", Icon: "partly_cloudy", MinF: 52, MaxF: 65},
-			{Date: "2026-05-03", Icon: "rainy", MinF: 50, MaxF: 60},
-		},
+		TempMinF:      overallMin,
+		TempMaxF:      overallMax,
+		RainDays:      rainDays,
+		SnowDays:      0,
+		IsForecast:    true,
+		DailyForecast: forecast,
 	}
 }
 
