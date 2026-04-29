@@ -277,6 +277,7 @@ export default function PackingListPage() {
   const queryClient = useQueryClient()
   const [showAddForm, setShowAddForm] = useState(false)
   const [toggleError, setToggleError] = useState(null)
+  const [deleteError, setDeleteError] = useState(null)
 
   const { data: trip, isLoading, isError, error } = useQuery({
     queryKey: ['trip', tripId],
@@ -307,7 +308,10 @@ export default function PackingListPage() {
   const deleteMutation = useMutation({
     mutationFn: () => deleteTrip(tripId),
     onSuccess: () => navigate('/'),
-    onError: (err) => alert(err?.message ?? 'Failed to delete trip. Please try again.'),
+    onError: (err) => {
+      setDeleteError(err?.message ?? 'Failed to delete trip. Please try again.')
+      setTimeout(() => setDeleteError(null), 3000)
+    },
   })
 
   function handleToggle(itemId, isChecked) {
@@ -316,6 +320,7 @@ export default function PackingListPage() {
 
   function handleDelete() {
     if (window.confirm('Are you sure you want to delete this trip? This cannot be undone.')) {
+      setDeleteError(null)
       deleteMutation.mutate()
     }
   }
@@ -395,6 +400,9 @@ export default function PackingListPage() {
               {deleteMutation.isPending ? 'Deleting…' : '🗑️ Delete Trip'}
             </button>
           </div>
+          {deleteError && (
+            <p className="text-xs text-red-600 font-medium mt-2">⚠️ {deleteError}</p>
+          )}
         </div>
 
         {/* Progress */}
