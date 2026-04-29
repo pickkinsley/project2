@@ -143,7 +143,7 @@ function AddItemForm({ tripId, onSuccess, onCancel }) {
     mutationFn: (itemData) => createPackingItem(tripId, itemData),
     onMutate: async (itemData) => {
       await queryClient.cancelQueries({ queryKey: ['trip', tripId] })
-      const previous = queryClient.getQueryData(['trip', tripId])
+      const snapshot = queryClient.getQueryData(['trip', tripId])
       const tempId = -Date.now()
       const tempItem = {
         id: tempId,
@@ -158,10 +158,10 @@ function AddItemForm({ tripId, onSuccess, onCancel }) {
         ...old,
         items: [...old.items, tempItem],
       }))
-      return { previous, tempId }
+      return { snapshot, tempId }
     },
     onError: (_err, _vars, context) => {
-      queryClient.setQueryData(['trip', tripId], context.previous)
+      queryClient.setQueryData(['trip', tripId], context.snapshot)
     },
     onSuccess: (serverItem, _vars, context) => {
       queryClient.setQueryData(['trip', tripId], (old) => ({
@@ -288,17 +288,17 @@ export default function PackingListPage() {
     mutationFn: ({ itemId, isChecked }) => updateItemChecked(tripId, itemId, isChecked),
     onMutate: async ({ itemId, isChecked }) => {
       await queryClient.cancelQueries({ queryKey: ['trip', tripId] })
-      const previous = queryClient.getQueryData(['trip', tripId])
+      const snapshot = queryClient.getQueryData(['trip', tripId])
       queryClient.setQueryData(['trip', tripId], (old) => ({
         ...old,
         items: old.items.map((item) =>
           item.id === itemId ? { ...item, is_checked: isChecked } : item
         ),
       }))
-      return { previous }
+      return { snapshot }
     },
     onError: (_err, _vars, context) => {
-      queryClient.setQueryData(['trip', tripId], context.previous)
+      queryClient.setQueryData(['trip', tripId], context.snapshot)
       setToggleError('Failed to save — please try again.')
       setTimeout(() => setToggleError(null), 3000)
     },

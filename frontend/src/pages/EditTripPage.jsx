@@ -57,8 +57,8 @@ function EditTripForm({ trip, tripId }) {
   })
   const [errors, setErrors] = useState({})
 
-  const mutation = useMutation({
-    mutationFn: (formData) => updateTrip(tripId, formData),
+  const updateMutation = useMutation({
+    updateMutationFn: (formData) => updateTrip(tripId, formData),
     onSuccess: () => navigate(`/packing-list/${tripId}`),
   })
 
@@ -70,7 +70,7 @@ function EditTripForm({ trip, tripId }) {
     const { name, value } = e.target
     setForm((f) => ({ ...f, [name]: value }))
     clearFieldError(name)
-    mutation.reset()
+    updateMutation.reset()
   }
 
   function handleActivityToggle(value) {
@@ -81,7 +81,7 @@ function EditTripForm({ trip, tripId }) {
       return { ...f, activities: next }
     })
     clearFieldError('activities')
-    mutation.reset()
+    updateMutation.reset()
   }
 
   function validate() {
@@ -104,7 +104,7 @@ function EditTripForm({ trip, tripId }) {
       setErrors(errs)
       return
     }
-    mutation.mutate(form)
+    updateMutation.mutate(form)
   }
 
   return (
@@ -114,13 +114,12 @@ function EditTripForm({ trip, tripId }) {
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Edit Trip Details</h1>
-          <p className="mt-2 text-gray-500 text-sm">Update your trip information</p>
         </div>
 
         {/* API error banner */}
-        {mutation.isError && (
+        {updateMutation.isError && (
           <div className="mb-6 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
-            {mutation.error?.message ?? 'Something went wrong. Please try again.'}
+            {updateMutation.error?.message ?? 'Something went wrong. Please try again.'}
           </div>
         )}
 
@@ -256,10 +255,10 @@ function EditTripForm({ trip, tripId }) {
           <div className="flex gap-3 mt-2">
             <button
               type="submit"
-              disabled={mutation.isPending}
+              disabled={updateMutation.isPending}
               className="flex-1 rounded-lg bg-pink-500 hover:bg-pink-600 disabled:opacity-60 disabled:cursor-not-allowed text-white font-semibold py-3 text-sm transition-colors"
             >
-              {mutation.isPending ? 'Saving…' : 'Save Changes'}
+              {updateMutation.isPending ? 'Saving…' : 'Save Changes'}
             </button>
             <Link
               to={`/packing-list/${tripId}`}

@@ -56,8 +56,8 @@ export default function HomePage() {
   const [form, setForm] = useState(EMPTY_FORM)
   const [errors, setErrors] = useState({})
 
-  const mutation = useMutation({
-    mutationFn: createTrip,
+  const createMutation = useMutation({
+    createMutationFn: createTrip,
     onSuccess: (data) => navigate(`/packing-list/${data.id}`),
   })
 
@@ -69,7 +69,7 @@ export default function HomePage() {
     const { name, value } = e.target
     setForm((f) => ({ ...f, [name]: value }))
     clearFieldError(name)
-    mutation.reset()
+    createMutation.reset()
   }
 
   function handleActivityToggle(value) {
@@ -80,7 +80,7 @@ export default function HomePage() {
       return { ...f, activities: next }
     })
     clearFieldError('activities')
-    mutation.reset()
+    createMutation.reset()
   }
 
   function validate() {
@@ -91,7 +91,7 @@ export default function HomePage() {
     if (form.departure_date && form.return_date && form.return_date <= form.departure_date)
       e.return_date = 'Return date must be after departure date.'
     if (!form.trip_type)          e.trip_type = 'Trip type is required.'
-    if (!form.companions)         e.companions = 'Companions is required.'
+    if (!form.companions)         e.companions = 'Traveling With is required.'
     if (form.activities.length === 0) e.activities = 'Select at least one activity.'
     return e
   }
@@ -103,7 +103,7 @@ export default function HomePage() {
       setErrors(errs)
       return
     }
-    mutation.mutate(form)
+    createMutation.mutate(form)
   }
 
   return (
@@ -112,14 +112,13 @@ export default function HomePage() {
 
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">🎒 PackSmart</h1>
-          <p className="mt-2 text-gray-500 text-sm">Enter your trip details and get a personalized packing list.</p>
+          <h1 className="text-3xl font-bold text-gray-900">🎒 Create Your Packing List</h1>
         </div>
 
         {/* API error banner */}
-        {mutation.isError && (
+        {createMutation.isError && (
           <div className="mb-6 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
-            {mutation.error?.message ?? 'Something went wrong. Please try again.'}
+            {createMutation.error?.message ?? 'Something went wrong. Please try again.'}
           </div>
         )}
 
@@ -254,10 +253,10 @@ export default function HomePage() {
           {/* Submit */}
           <button
             type="submit"
-            disabled={mutation.isPending}
+            disabled={createMutation.isPending}
             className="w-full rounded-lg bg-pink-500 hover:bg-pink-600 disabled:opacity-60 disabled:cursor-not-allowed text-white font-semibold py-3 text-sm transition-colors mt-2"
           >
-            {mutation.isPending ? 'Creating…' : 'Generate Packing List'}
+            {createMutation.isPending ? 'Creating…' : 'Generate Packing List'}
           </button>
 
         </form>

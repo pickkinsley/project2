@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, NavLink, useMatch } from 'react-router-dom'
 
 const NAV_LINKS = [
@@ -18,12 +18,20 @@ const TEXT_SHADOW = { textShadow: '0 1px 3px rgba(255,255,255,0.8)' }
 export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false)
 
+  useEffect(() => {
+    function handleKeyDown(e) {
+      if (e.key === 'Escape' && menuOpen) setMenuOpen(false)
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [menuOpen])
+
   // Treat packing list and edit trip pages as part of the Create Trip flow
   const onPackingList = useMatch('/packing-list/:id')
   const onEditTrip    = useMatch('/edit-trip/:id')
   const createTripActive = !!(onPackingList || onEditTrip)
 
-  const linkClass = ({ isActive }, to) => {
+  const navLinkClass = ({ isActive }, to) => {
     const active = isActive || (to === '/' && createTripActive)
     return `text-sm font-bold transition-colors ${
       active ? 'text-black' : 'text-black/70 hover:text-black'
@@ -53,7 +61,7 @@ export default function Header() {
               key={to}
               to={to}
               end={to === '/'}
-              className={(state) => linkClass(state, to)}
+              className={(state) => navLinkClass(state, to)}
               style={TEXT_SHADOW}
             >
               {label}
@@ -67,6 +75,8 @@ export default function Header() {
           style={TEXT_SHADOW}
           onClick={() => setMenuOpen((o) => !o)}
           aria-label="Toggle menu"
+          aria-expanded={menuOpen}
+          aria-controls="mobile-menu"
         >
           {menuOpen ? (
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -82,7 +92,7 @@ export default function Header() {
 
       {/* Mobile menu */}
       {menuOpen && (
-        <nav className="sm:hidden border-t border-pink-200 px-4 py-3 flex flex-col gap-1" style={STRIPE_BG}>
+        <nav id="mobile-menu" className="sm:hidden border-t border-pink-200 px-4 py-3 flex flex-col gap-1" style={STRIPE_BG}>
           {NAV_LINKS.map(({ to, label }) => (
             <NavLink
               key={to}
