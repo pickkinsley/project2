@@ -29,8 +29,10 @@ type WeatherResponse struct {
 // DailyForecast represents one day in the weather strip.
 // Stored as a JSON array in the daily_forecast column of weather_snapshots.
 type DailyForecast struct {
-	Date string `json:"date"`   // YYYY-MM-DD
-	Icon string `json:"icon"`   // sunny | partly_cloudy | cloudy | rainy | snowy | stormy
-	MinF int    `json:"min_f"`
-	MaxF int    `json:"max_f"`
+	Date              string  `json:"date"`               // YYYY-MM-DD
+	Icon              string  `json:"icon"`               // sunny | partly_cloudy | cloudy | rainy | snowy | stormy
+	MinF              int     `json:"min_f"`
+	MaxF              int     `json:"max_f"`
+	PrecipProbability int     `json:"precip_probability"` // 0–100 %
+	WindSpeedMph      float64 `json:"wind_speed_mph"`
 }

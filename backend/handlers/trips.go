@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -13,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	dbpkg "github.com/pickkinsley/project2/backend/db"
 	"github.com/pickkinsley/project2/backend/models"
+	"github.com/pickkinsley/project2/backend/weather"
 )
 
 // Handler holds the database connection and query interface.
@@ -27,8 +29,6 @@ func NewHandler(sqlDB *sql.DB, q *dbpkg.Queries) *Handler {
 }
 
 // CreateTrip handles POST /api/trips.
-// TODO (Lesson 2 — geocoding): Replace DestLat/DestLon "0.000000" with real Open-Meteo geocoding.
-// TODO (Lesson 2 — weather): Replace mockWeather() with real Open-Meteo forecast.
 // TODO (Lesson 2 — rules): Replace mockItems() with real rule engine output.
 func (h *Handler) CreateTrip(c *gin.Context) {
 	log.Printf("[INFO] POST /api/trips - Creating new trip")
@@ -76,6 +76,51 @@ func (h *Handler) CreateTrip(c *gin.Context) {
 
 	log.Printf("[DEBUG] POST /api/trips - Destination: %q, TripType: %q, Duration: %d days", req.Destination, req.TripType, durationDays)
 
+	// ── Geocode destination ──────────────────────────────────────────────────
+	loc, geoErr := weather.GeocodeLocation(req.Destination)
+	if geoErr != nil {
+		log.Printf("[ERROR] POST /api/trips - Geocoding failed: %v", geoErr)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":   "internal_error",
+			"message": "Failed to look up destination.",
+		})
+		return
+	}
+	if loc == nil {
+		log.Printf("[INFO] POST /api/trips - Destination not found: %q", req.Destination)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "destination_not_found",
+			"message": "We couldn't find that destination. Please check the spelling or try a nearby city.",
+		})
+		return
+	}
+	destLat := fmt.Sprintf("%f", loc.Latitude)
+	destLon := fmt.Sprintf("%f", loc.Longitude)
+	log.Printf("[DEBUG] POST /api/trips - Geocoded %q → lat=%s lon=%s", req.Destination, destLat, destLon)
+
+	// ── Fetch weather forecast (free tier: 16 days ahead max) ────────────────
+	var weatherResp *models.WeatherResponse
+	today := time.Now().Truncate(24 * time.Hour)
+	daysOut := int(departure.Sub(today).Hours() / 24)
+	if daysOut <= weather.ForecastMaxDays {
+		// Cap end date to the forecast window so long trips still get partial data.
+		endDate := req.ReturnDate
+		maxDate := today.AddDate(0, 0, weather.ForecastMaxDays).Format("2006-01-02")
+		if req.ReturnDate > maxDate {
+			endDate = maxDate
+			log.Printf("[DEBUG] POST /api/trips - Trip extends beyond forecast window, capping to %s", maxDate)
+		}
+		w, wErr := weather.FetchForecast(loc.Latitude, loc.Longitude, req.DepartureDate, endDate)
+		if wErr != nil {
+			log.Printf("[WARN] POST /api/trips - Weather forecast unavailable (non-fatal): %v", wErr)
+		} else {
+			weatherResp = w
+			log.Printf("[DEBUG] POST /api/trips - Forecast fetched: %d days, min=%d°F max=%d°F", len(weatherResp.DailyForecast), weatherResp.TempMinF, weatherResp.TempMaxF)
+		}
+	} else {
+		log.Printf("[INFO] POST /api/trips - Trip departs in %d days, beyond %d-day forecast window", daysOut, weather.ForecastMaxDays)
+	}
+
 	activitiesJSON, err := json.Marshal(req.Activities)
 	if err != nil {
 		log.Printf("[ERROR] POST /api/trips - Failed to encode activities: %v", err)
@@ -83,15 +128,7 @@ func (h *Handler) CreateTrip(c *gin.Context) {
 		return
 	}
 
-	weather := mockWeather(departure, returnDate)
 	items := mockItems(req.TripType)
-
-	forecastJSON, err := json.Marshal(weather.DailyForecast)
-	if err != nil {
-		log.Printf("[ERROR] POST /api/trips - Failed to encode forecast: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Failed to encode forecast."})
-		return
-	}
 
 	// Write trip, weather, and items in a single transaction.
 	log.Printf("[DEBUG] POST /api/trips - Beginning transaction for trip %s", tripID)
@@ -106,8 +143,8 @@ func (h *Handler) CreateTrip(c *gin.Context) {
 	if err := qtx.InsertTrip(ctx, dbpkg.InsertTripParams{
 		ID:            tripID,
 		Destination:   req.Destination,
-		DestLat:       "0.000000", // TODO: replace with geocoded lat
-		DestLon:       "0.000000", // TODO: replace with geocoded lon
+		DestLat:       destLat,
+		DestLon:       destLon,
 		DepartureDate: departure,
 		ReturnDate:    returnDate,
 		TripType:      req.TripType,
@@ -121,21 +158,32 @@ func (h *Handler) CreateTrip(c *gin.Context) {
 	}
 	log.Printf("[DEBUG] POST /api/trips - Trip row inserted")
 
-	if err := qtx.InsertWeatherSnapshot(ctx, dbpkg.InsertWeatherSnapshotParams{
-		TripID:        tripID,
-		TempMinF:      int32(weather.TempMinF),
-		TempMaxF:      int32(weather.TempMaxF),
-		RainDays:      int32(weather.RainDays),
-		SnowDays:      int32(weather.SnowDays),
-		IsForecast:    weather.IsForecast,
-		DailyForecast: json.RawMessage(forecastJSON),
-	}); err != nil {
-		tx.Rollback()
-		log.Printf("[ERROR] POST /api/trips - InsertWeatherSnapshot failed: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Failed to save weather."})
-		return
+	if weatherResp != nil {
+		forecastJSON, err := json.Marshal(weatherResp.DailyForecast)
+		if err != nil {
+			tx.Rollback()
+			log.Printf("[ERROR] POST /api/trips - Failed to encode forecast: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Failed to encode forecast."})
+			return
+		}
+		if err := qtx.InsertWeatherSnapshot(ctx, dbpkg.InsertWeatherSnapshotParams{
+			TripID:        tripID,
+			TempMinF:      int32(weatherResp.TempMinF),
+			TempMaxF:      int32(weatherResp.TempMaxF),
+			RainDays:      int32(weatherResp.RainDays),
+			SnowDays:      int32(weatherResp.SnowDays),
+			IsForecast:    weatherResp.IsForecast,
+			DailyForecast: json.RawMessage(forecastJSON),
+		}); err != nil {
+			tx.Rollback()
+			log.Printf("[ERROR] POST /api/trips - InsertWeatherSnapshot failed: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Failed to save weather."})
+			return
+		}
+		log.Printf("[DEBUG] POST /api/trips - Weather snapshot inserted")
+	} else {
+		log.Printf("[DEBUG] POST /api/trips - No weather snapshot (forecast unavailable)")
 	}
-	log.Printf("[DEBUG] POST /api/trips - Weather snapshot inserted")
 
 	for _, item := range items {
 		if err := qtx.InsertPackingItem(ctx, dbpkg.InsertPackingItemParams{
@@ -182,7 +230,7 @@ func (h *Handler) CreateTrip(c *gin.Context) {
 		Activities:    req.Activities,
 		DurationDays:  durationDays,
 		CreatedAt:     time.Now().UTC(),
-		Weather:       weather,
+		Weather:       weatherResp,
 		Items:         dbItemsToResponse(dbItems),
 	})
 }
@@ -565,52 +613,6 @@ func dbItemsToResponse(rows []dbpkg.PackingItem) []models.PackingItem {
 	return out
 }
 
-// mockWeather generates a per-day forecast for the actual trip duration.
-// TODO (Lesson 2 — weather): Replace with real Open-Meteo forecast data.
-func mockWeather(departure, returnDate time.Time) *models.WeatherResponse {
-	icons := []string{"sunny", "partly_cloudy", "rainy", "sunny", "partly_cloudy", "cloudy"}
-	// Base temps that shift slightly each day for variety
-	baseMins := []int{52, 50, 48, 54, 55, 51, 53}
-	baseMaxs := []int{68, 65, 60, 70, 72, 64, 67}
-
-	var forecast []models.DailyForecast
-	rainDays := 0
-	overallMin := 999
-	overallMax := 0
-
-	for d := departure; !d.After(returnDate); d = d.AddDate(0, 0, 1) {
-		i := len(forecast)
-		icon := icons[i%len(icons)]
-		minF := baseMins[i%len(baseMins)]
-		maxF := baseMaxs[i%len(baseMaxs)]
-
-		if icon == "rainy" || icon == "stormy" {
-			rainDays++
-		}
-		if minF < overallMin {
-			overallMin = minF
-		}
-		if maxF > overallMax {
-			overallMax = maxF
-		}
-
-		forecast = append(forecast, models.DailyForecast{
-			Date: d.Format("2006-01-02"),
-			Icon: icon,
-			MinF: minF,
-			MaxF: maxF,
-		})
-	}
-
-	return &models.WeatherResponse{
-		TempMinF:      overallMin,
-		TempMaxF:      overallMax,
-		RainDays:      rainDays,
-		SnowDays:      0,
-		IsForecast:    true,
-		DailyForecast: forecast,
-	}
-}
 
 // mockItems returns a small packing list based on trip type until the rule engine is added.
 // TODO (Lesson 2 — rules): Replace with real rule engine output.
