@@ -58,7 +58,7 @@ function EditTripForm({ trip, tripId }) {
   const [errors, setErrors] = useState({})
 
   const updateMutation = useMutation({
-    updateMutationFn: (formData) => updateTrip(tripId, formData),
+    mutationFn: (formData) => updateTrip(tripId, formData),
     onSuccess: () => navigate(`/packing-list/${tripId}`),
   })
 

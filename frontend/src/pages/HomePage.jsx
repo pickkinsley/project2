@@ -57,7 +57,7 @@ export default function HomePage() {
   const [errors, setErrors] = useState({})
 
   const createMutation = useMutation({
-    createMutationFn: createTrip,
+    mutationFn: createTrip,
     onSuccess: (data) => navigate(`/packing-list/${data.id}`),
   })
 
