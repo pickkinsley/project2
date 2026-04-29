@@ -1,21 +1,13 @@
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { listTrips } from '../api/trips.js'
-
-function formatDate(dateStr) {
-  const [y, m, d] = dateStr.split('-')
-  return new Date(y, m - 1, d).toLocaleDateString('en-US', {
-    month: 'short', day: 'numeric', year: 'numeric',
-  })
-}
+import { formatDate } from '../utils/formatDate.js'
 
 function TripCard({ trip }) {
-  const navigate = useNavigate()
-
   return (
-    <div
-      onClick={() => navigate(`/packing-list/${trip.id}`)}
-      className="bg-white rounded-2xl shadow-sm border border-transparent hover:border-pink-300 hover:shadow-md cursor-pointer transition-all duration-200 p-6 flex flex-col gap-3"
+    <Link
+      to={`/packing-list/${trip.id}`}
+      className="bg-white rounded-2xl shadow-sm border border-transparent hover:border-pink-300 hover:shadow-md transition-all duration-200 p-6 flex flex-col gap-3 focus:outline-none focus:ring-2 focus:ring-pink-400"
     >
       {/* Destination */}
       <div>
@@ -43,7 +35,7 @@ function TripCard({ trip }) {
         </span>
         <span className="text-xs font-semibold text-pink-500">View list →</span>
       </div>
-    </div>
+    </Link>
   )
 }
 
@@ -88,8 +80,7 @@ export default function MyTripsPage() {
         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-10 text-center">
           <div className="text-5xl mb-4">🗂️</div>
           <h1 className="text-2xl font-bold text-gray-900 mb-2">My Trips</h1>
-          <p className="text-gray-500 text-sm mb-1">Your saved trips will appear here.</p>
-          <p className="text-gray-400 text-sm mb-8">Create your first packing list to get started!</p>
+          <p className="text-gray-500 text-sm mb-8">Create your first packing list to get started!</p>
           <Link
             to="/"
             className="inline-block bg-pink-500 hover:bg-pink-600 text-white font-semibold px-6 py-2.5 rounded-lg text-sm transition-colors"

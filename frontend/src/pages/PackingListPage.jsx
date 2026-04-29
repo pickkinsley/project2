@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getTrip, updateItemChecked, deleteTrip, createPackingItem } from '../api/trips.js'
+import { formatDate } from '../utils/formatDate.js'
 
 // ─── Weather ────────────────────────────────────────────────────────────────
 
@@ -18,7 +19,7 @@ function WeatherCard({ weather }) {
   if (!weather) {
     return (
       <div className="bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4 text-sm text-amber-800">
-        ⚠️ Weather forecast unavailable — showing general recommendations for your trip type.
+        ⚠️ Weather forecast unavailable for these dates.
       </div>
     )
   }
@@ -129,6 +130,14 @@ function AddItemForm({ tripId, onSuccess, onCancel }) {
   const [name, setName] = useState('')
   const [category, setCategory] = useState('')
   const [errors, setErrors] = useState({})
+
+  useEffect(() => {
+    function handleKeyDown(e) {
+      if (e.key === 'Escape') onCancel()
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [onCancel])
 
   const addMutation = useMutation({
     mutationFn: (itemData) => createPackingItem(tripId, itemData),
@@ -259,12 +268,6 @@ function groupByCategory(items) {
   return groups
 }
 
-function formatDate(dateStr) {
-  const [y, m, d] = dateStr.split('-')
-  return new Date(y, m - 1, d).toLocaleDateString('en-US', {
-    month: 'short', day: 'numeric', year: 'numeric',
-  })
-}
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
@@ -358,7 +361,7 @@ export default function PackingListPage() {
 
         {/* Back link */}
         <Link to="/" className="inline-flex items-center gap-1 text-rose-700 hover:text-rose-900 text-sm transition-colors">
-          ← New Trip
+          ← Home
         </Link>
 
         {/* Trip header */}
@@ -389,7 +392,7 @@ export default function PackingListPage() {
               disabled={deleteMutation.isPending}
               className="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-rose-300 text-rose-600 text-sm font-semibold hover:bg-rose-50 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
             >
-              {deleteMutation.isPending ? 'Deleting…' : '🗑️ Delete'}
+              {deleteMutation.isPending ? 'Deleting…' : '🗑️ Delete Trip'}
             </button>
           </div>
         </div>
@@ -397,7 +400,6 @@ export default function PackingListPage() {
         {/* Progress */}
         <div className="bg-white rounded-2xl shadow-sm px-6 py-4">
           <div className="flex items-center justify-between text-sm mb-2">
-            <span className="font-medium text-gray-700">Packing progress</span>
             <span className="text-gray-500">{checkedCount} of {totalCount} items</span>
           </div>
           <div
