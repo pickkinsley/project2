@@ -130,6 +130,36 @@ A `deleteError` state variable was added alongside the existing `toggleError`, a
 
 ---
 
+## Bugs Introduced and Fixed
+
+### `mutationFn` key corrupted by `replace_all` rename
+
+**Files affected:** `HomePage.jsx`, `EditTripPage.jsx`
+
+When renaming `mutation` → `createMutation` and `mutation` → `updateMutation` using a global find-and-replace, the rename also hit the `mutationFn` option key inside the `useMutation` config object:
+
+```js
+// Intended result
+const createMutation = useMutation({
+  mutationFn: createTrip,   // ← key name, should not be renamed
+  ...
+})
+
+// Actual result after replace_all
+const createMutation = useMutation({
+  createMutationFn: createTrip,   // ← corrupted — TanStack Query doesn't recognize this
+  ...
+})
+```
+
+TanStack Query silently ignores unrecognized keys and falls back to no `mutationFn`, producing the runtime error: **"No mutationFn found"** when the form was submitted.
+
+**Fix:** Restored `mutationFn` (and `updateMutationFn` → `mutationFn`) in both files.
+
+**Lesson:** `replace_all` renames are blunt instruments. The string being renamed (`mutation`) appeared both as a variable name *and* as a substring of an unrelated config key (`mutationFn`). A more targeted replace — or a manual review pass after the rename — would have caught this immediately. When a rename touches a high-traffic keyword, verify that no option keys, object properties, or string literals were unintentionally affected.
+
+---
+
 ## Impact Summary
 
 | Metric | Result |
@@ -182,3 +212,6 @@ Unused files (boilerplate, dead assets, empty folders) are not harmless. They cr
 
 **Consistent patterns are a form of documentation.**
 When every mutation in the app handles errors the same way (inline state, auto-clear timeout), a developer reading any one mutation immediately knows how error handling works everywhere. When one mutation uses `alert()`, that consistency is broken and the outlier demands extra attention. Uniformity makes a codebase easier to maintain because there are fewer special cases to remember.
+
+**`replace_all` renames require a verification pass.**
+Global string replacement is fast but indiscriminate. Renaming `mutation` hit not just the variable but also the `mutationFn` config key, breaking both pages silently at runtime. After any broad rename, scan the diff for unintended collateral changes — especially when the renamed string is a common substring.
