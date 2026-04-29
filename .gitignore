@@ -9,6 +9,7 @@ frontend/dist/
 
 # Go build output
 backend/server
+backend/server_linux
 backend/*.exe
 
 # OS files
