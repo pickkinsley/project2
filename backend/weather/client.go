@@ -8,6 +8,7 @@ import (
 	"math"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/pickkinsley/project2/backend/models"
@@ -53,9 +54,19 @@ type forecastResponse struct {
 
 // GeocodeLocation resolves a destination string to lat/lon using Open-Meteo
 // geocoding. Returns (nil, nil) when the destination is not found.
+//
+// Open-Meteo geocoding works best with city names only. "Paris, France" and
+// "London, UK" both succeed when we use only the part before the first comma.
 func GeocodeLocation(destination string) (*GeocodedLocation, error) {
+	// Use only the city portion — the API ignores country qualifiers and
+	// treats commas as unexpected input, causing missed lookups.
+	query := destination
+	if idx := strings.Index(destination, ","); idx != -1 {
+		query = strings.TrimSpace(destination[:idx])
+	}
+
 	params := url.Values{}
-	params.Set("name", destination)
+	params.Set("name", query)
 	params.Set("count", "1")
 	params.Set("language", "en")
 	params.Set("format", "json")
