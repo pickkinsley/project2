@@ -15,11 +15,23 @@ const WEATHER_ICONS = {
   stormy:        '⛈️',
 }
 
-function WeatherCard({ weather }) {
+function WeatherCard({ weather, departureDate }) {
   if (!weather) {
+    const [y, m, d] = departureDate.split('-')
+    const departure = new Date(y, m - 1, d)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const daysUntilDeparture = Math.round((departure - today) / (1000 * 60 * 60 * 24))
+    const daysUntilForecast = daysUntilDeparture - 16
+
+    let message = 'Weather forecasts are available for trips within 16 days.'
+    if (daysUntilDeparture > 16) {
+      message += ` Your trip departs in ${daysUntilDeparture} days, so we're showing general recommendations. Check back in ${daysUntilForecast} day${daysUntilForecast !== 1 ? 's' : ''} to see the actual forecast.`
+    }
+
     return (
       <div className="bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4 text-sm text-amber-800">
-        ⚠️ Weather forecast unavailable for these dates.
+        ⚠️ {message}
       </div>
     )
   }
@@ -432,7 +444,7 @@ export default function PackingListPage() {
         </div>
 
         {/* Weather */}
-        <WeatherCard weather={trip.weather} />
+        <WeatherCard weather={trip.weather} departureDate={trip.departure_date} />
 
         {/* Add Item button / form */}
         {showAddForm ? (
