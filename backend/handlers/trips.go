@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	dbpkg "github.com/pickkinsley/project2/backend/db"
 	"github.com/pickkinsley/project2/backend/models"
+	"github.com/pickkinsley/project2/backend/rules"
 	"github.com/pickkinsley/project2/backend/weather"
 )
 
@@ -29,7 +30,6 @@ func NewHandler(sqlDB *sql.DB, q *dbpkg.Queries) *Handler {
 }
 
 // CreateTrip handles POST /api/trips.
-// TODO (Lesson 2 — rules): Replace mockItems() with real rule engine output.
 func (h *Handler) CreateTrip(c *gin.Context) {
 	log.Printf("[INFO] POST /api/trips - Creating new trip")
 
@@ -128,7 +128,13 @@ func (h *Handler) CreateTrip(c *gin.Context) {
 		return
 	}
 
-	items := mockItems(req.TripType)
+	items := rules.GeneratePackingList(rules.TripContext{
+		TripType:     req.TripType,
+		Companions:   req.Companions,
+		Activities:   req.Activities,
+		DurationDays: durationDays,
+		Weather:      weatherResp,
+	})
 
 	// Write trip, weather, and items in a single transaction.
 	log.Printf("[DEBUG] POST /api/trips - Beginning transaction for trip %s", tripID)
@@ -614,32 +620,3 @@ func dbItemsToResponse(rows []dbpkg.PackingItem) []models.PackingItem {
 }
 
 
-// mockItems returns a small packing list based on trip type until the rule engine is added.
-// TODO (Lesson 2 — rules): Replace with real rule engine output.
-func mockItems(tripType string) []models.PackingItem {
-	items := []models.PackingItem{
-		{Name: "Prescriptions", Category: "Essential Items", IsEssential: true, Reason: "Never travel without your medications", SortOrder: 1},
-		{Name: "Phone charger", Category: "Electronics", IsEssential: false, Reason: "Keep your phone powered", SortOrder: 65},
-		{Name: "Toothbrush + toothpaste", Category: "Toiletries", IsEssential: false, Reason: "Daily essential", SortOrder: 40},
-	}
-
-	switch tripType {
-	case "international":
-		items = append([]models.PackingItem{
-			{Name: "Passport", Category: "Essential Items", IsEssential: true, Reason: "Required for international travel", SortOrder: 0},
-			{Name: "Power adapter", Category: "Essential Items", IsEssential: true, Reason: "Different outlets abroad", SortOrder: 2},
-		}, items...)
-	case "beach":
-		items = append(items,
-			models.PackingItem{Name: "Swimsuit", Category: "Clothing", IsEssential: false, Reason: "Beach trip essential", SortOrder: 20},
-			models.PackingItem{Name: "Sunscreen (SPF 30+)", Category: "Essential Items", IsEssential: true, Reason: "Protect your skin at the beach", SortOrder: 3},
-		)
-	case "cold_weather":
-		items = append(items,
-			models.PackingItem{Name: "Heavy coat", Category: "Clothing", IsEssential: false, Reason: "Cold weather essential", SortOrder: 20},
-			models.PackingItem{Name: "Gloves", Category: "Clothing", IsEssential: false, Reason: "Keep hands warm", SortOrder: 21},
-		)
-	}
-
-	return items
-}
