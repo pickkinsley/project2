@@ -215,3 +215,83 @@ When every mutation in the app handles errors the same way (inline state, auto-c
 
 **`replace_all` renames require a verification pass.**
 Global string replacement is fast but indiscriminate. Renaming `mutation` hit not just the variable but also the `mutationFn` config key, breaking both pages silently at runtime. After any broad rename, scan the diff for unintended collateral changes — especially when the renamed string is a common substring.
+
+---
+
+## Smart Packing Rules Engine
+
+### Overview
+
+Replaced the 3–5 item mock packing list with an intelligent rules engine that generates 50–70+ specific, actionable items based on real weather data, trip characteristics, and user preferences.
+
+### Implementation
+
+Created `backend/rules/` package with 6 modules:
+
+| File | Responsibility |
+|------|----------------|
+| `engine.go` | `TripContext` struct, `GeneratePackingList` orchestration, deduplication |
+| `base_items.go` | Universal essentials + clothing quantities scaled to trip duration |
+| `weather_rules.go` | Temperature, precipitation, wind, and snow-based items |
+| `trip_type_rules.go` | International, domestic, beach, cold_weather, business specifics |
+| `activity_rules.go` | 19 activities: hiking, skiing, nightlife, camping, road trip, etc. |
+| `companion_rules.go` | Family/kids gear, couple items, group supplies |
+
+**Engine execution order:**
+1. Base items (everyone needs these)
+2. Trip-type items
+3. Weather items — skipped entirely when `ctx.Weather == nil`
+4. Activity items (each activity stacks its own gear)
+5. Companion items
+6. Deduplication (case-insensitive, first occurrence wins)
+
+### Integration
+
+- `handlers/trips.go`: replaced `mockItems(req.TripType)` with `rules.GeneratePackingList(rules.TripContext{...})`
+- `TripContext.Weather` is set to the real Open-Meteo forecast, so weather rules fire on actual forecast data
+- `mockItems()` function removed entirely
+
+### Key Features
+
+**Weather-aware recommendations**
+The engine receives the real Open-Meteo forecast and acts on it. Paris in May with lows in the 40s and 1 rainy day → winter coat + warm layers + compact travel umbrella. A beach trip with warm temps → lightweight breathable tops + shorts instead.
+
+**Smart quantity calculations**
+Clothing quantities are computed from trip duration, not hardcoded:
+- Underwear and socks: `days + 1`, clamped to [3, 10]
+- T-shirts / tops: `(days + 1) / 2 + 1`, clamped to [2, 7]
+- Pants / bottoms: `days / 3 + 1`, clamped to [1, 4]
+
+A 7-day trip generates "Underwear (8 pairs)" and "T-shirts / tops (5)" — right-sized, not generic.
+
+**Activity stacking**
+Each activity in `ctx.Activities` independently contributes items. A beach + hiking trip gets both beach gear (swimsuit, reef-safe sunscreen, snorkel) and hiking gear (boots, trekking poles, electrolyte packets) with no duplication.
+
+**Companion intelligence**
+- `family` → kids clothing extras, children's sunscreen, diapers with day-count in the name, portable white noise machine, travel games, coloring books
+- `couple` → nice dinner outfit, camera accessories, travel games for two
+- `group` → Bluetooth speaker, power strip with USB ports, shared snack supply
+
+**Deduplication**
+Multiple rule groups can independently suggest the same item. The deduplication pass (case-insensitive name match, first occurrence wins) ensures each item appears exactly once regardless of how many rules triggered it.
+
+### Test Results
+
+| Trip | Items Generated |
+|------|----------------|
+| Paris, 7 days, couple, sightseeing + fine dining | 55 items |
+| Miami, 5 days, family, beach + hiking | 70 items |
+
+Weather integration verified in production: Paris May forecast (42–71°F, 1 rain day) triggered winter coat, warm layers, gloves, scarf, and travel umbrella automatically.
+
+### Impact
+
+| Before | After |
+|--------|-------|
+| 3–5 hardcoded mock items | 50–70+ dynamic items |
+| Same list for every trip | Tailored to weather, activities, companions, duration |
+| Generic names ("Heavy coat") | Specific, actionable ("Winter coat or heavy jacket — lows in the 30s–40s require a serious outer layer") |
+| No weather integration | Items driven by real Open-Meteo forecast data |
+| No quantity logic | Clothing counts calculated from trip length |
+
+The packing list is now the core value proposition of the app — not a placeholder.
